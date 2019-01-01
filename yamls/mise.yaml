@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    entorno: desarrollo
+    nombre: mise
+  name: mise
+  namespace: default
+spec:
+  containers:
+  - image: egsmartin/mirepositorio:MiSe
+    name: mise
+    ports:
+    - containerPort: 3000
+      protocol: TCP
+  imagePullSecrets:
+  - name: micredencial
