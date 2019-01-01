@@ -18,6 +18,7 @@ minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-swit
 minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-switch="paraMiniKube" --v=7 
 
 //Check the status of the cluster
+
 kubectl cluster-info
 
 ## NOTE
@@ -27,14 +28,18 @@ In this case i have named the virtual switch as paraMiniKube
 
 # Quickstart
 ## Run an application
+
 kubectl run hello-minikube --image=k8s.gcr.io/echoserver:1.4 --port=8080
 
 ## Services
 //Public accessible
+
 kubectl expose deployment hello-minikube --type=LoadBalancer
 
 //Cluster accessible
+
 kubectl expose deployment hello-minikube --type=NodePort
+
 kubectl expose deployment hello-minikube --type=ClusterIP
 
 # Config Docker credentials
@@ -58,55 +63,75 @@ minikube dashboard
 # Get information
 ## Cluster status
 //Check the status of the cluster
+
 kubectl cluster-info
 
 ## Get Node information
 kubectl get nodes
+
 kubectl get nodes -o wide
 
 ## Pods
 //List of pods
+
 kubectl get pod
 
 //Gets additional information
+
 kubectl get pods -o wide
 
 //Describe a given pod
+
 kubectl describe pod hello-minikube-79c7645c7c-4rm9f
 
 //Gets a yaml with the definition and status of a given pod
+
 kubectl get pod hello-minikube-79c7645c7c-4rm9f -o yaml
 
 ## Services
 //List the services
+
 kubectl get services
+
 //This is an alias
+
 kubectl get svc
+
 //Gets extended information
+
 kubectl get svc -o wide
 
 //Url for the exposed service
+
 minikube service hello-minikube --url
 
 //Describe a service
+
 kubectl describe service hello-minikube
 
 ## Replica Sets & Replication Controlers
 //Get the replication controllers
+
 kubectl get replicationcontrollers
+
 kubectl get rc
 
 //Get the replica sets
+
 kubectl get rs 
 
 //Describe a Replica Set
+
 kubectl describe rs hello-minikube-79c7645c7c
 
 # Create resources declaratively (yaml)
 ## Help 
 //Get a description of the pod yaml
+
 kubectl explain pods
+
 //Further on this topic, we ask for a definition of the spec node withing the pods
+
 kubectl explain pod.spec
 
 ## Create resource
@@ -115,27 +140,38 @@ kubectl create -f mise.yaml
 //Create a service named kubia-http on the resource controller named Kubia
 //Type LoadBalancer makes the service publicly available
 //Type ClusterIp makes the service only accessible from within the cluster
+
 kubectl expose rc kubia --type=LoadBalancer --name kubia-http
 
 //Exposes as a public accessible service, the replica set hello-minikube-79c7645c7c
+
 kubectl expose rs hello-minikube-79c7645c7c --type=LoadBalancer --name miservicio
 
 //Exposes as a cluster only service, the replica set hello-minikube-79c7645c7c
+
 kubectl expose rs hello-minikube-79c7645c7c --type=ClusterIP --name miintserv
 
 # Labels
 ## Queries with Labels
 //Shows the labels
+
 kubectl get po --show-labels
+
 //Shows specific labels
+
 kubectl get po -L creation_method,env
+
 //Gest the pods with an specific label
+
 kubectl get po -l creation_method=manual
 
 ## Manage Labels
 //Add a label to a pod
+
 kubectl label po kubia-manual creation_method=manual
+
 //Adds or updates a label in a pod
+
 kubectl label po kubia-manual-v2 env=debug --overwrite
 
 # Namespaces
@@ -148,10 +184,12 @@ metadata:
   name: custom-namespace
 
 Or with a command:
+
 kubectl create namespace custom-namespace
 
 ## Manage
 //Retrieve pods with a given namespace:
+
 kubectl get po --namespace kube-system  
   
 # Annotations
@@ -160,12 +198,16 @@ kubectl annotate pod kubia-manual mycompany.com/someannotation="foo bar"
 
 # Scale
 //Scale the replication controller
+
 kubectl scale rs hello-minikube-79c7645c7c  --replicas=2
 
-#Logs
+# Logs
 //Logs for a pod named miservicio
+
 kubectl logs miservicio
+
 //When the pod has more than one image, we need to specify also the image where to fetch the logs from
+
 kubectl logs miservicio apinode
 
 # Delete
@@ -186,6 +228,7 @@ kubectl delete po --all
 
 ## Stop minikube
 minikube stop --alsologtostderr --v 7
+
 minikube stop 
 
 ## Delete minikube
