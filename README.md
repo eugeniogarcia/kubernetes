@@ -191,6 +191,12 @@ kubectl create namespace custom-namespace
 //Retrieve pods with a given namespace:
 
 kubectl get po --namespace kube-system  
+
+//When we do get we are retrieving the resources in the default namespace. Here we are retrieving the pods on a given namespace
+kubectl get po --namespace kube-system
+
+//Here we are retrieving the resources accross all the namespaces
+kubectl get po --all-namespaces
   
 # Annotations
 
