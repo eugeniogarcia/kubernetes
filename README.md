@@ -30,11 +30,12 @@ kubectl run hello-minikube --image=k8s.gcr.io/echoserver:1.4 --port=8080
 ## Services
 //Public accessible
 kubectl expose deployment hello-minikube --type=LoadBalancer
+
 //Cluster accessible
 kubectl expose deployment hello-minikube --type=NodePort
 kubectl expose deployment hello-minikube --type=ClusterIP
 
-#Config Docker credentials
+# Config Docker credentials
 When we want to fetch images from a private docker repository, we need to set up the credentials first on the Kubernetes cluster. Please refer to [Kubernetes page](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/):
 
 kubectl create secret docker-registry micredencial --docker-server=https://cloud.docker.com/u/egsmartin/repository/ --docker-username=egsmartin --docker-password=Pupa1511 --docker-email=egsmartin@gmail.com
