@@ -12,7 +12,9 @@
 minikube start 
 
 //With Hyper-v Enabled
+
 minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-switch="paraMiniKube" --v=7 --alsologtostderr
+
 minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-switch="paraMiniKube" --v=7 
 
 //Check the status of the cluster
