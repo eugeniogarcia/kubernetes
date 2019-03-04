@@ -330,7 +330,8 @@ Podemos especificar en el selector varios operadores:
 - ***DoesNotExist—Pod*** No debe incluir una etiqueta entre las informadas. La propiedad values no se tiene que informar  
 
 # Daemonsets
-No se schedulena. Se ejecutara un Pod exactamente en cada nodo.  
+Cuando necesitamos que se ejecute un Pod en cada nodo, Daemonsets es la solución. Este recurso no se schedulea. Cuado un nodo se elimine, o un nodo se añada, se creara el correspondiente demonio.  
+En el Deamonset podemos especificar un selector de nodos, de modo que podemos ontrolar sobre que nodos se aplicara el demonio. Por ejemplo, aqui solo consideramos nodos que tengan la etiqueta disk: ssd:   
 ```
 apiVersion: apps/v1beta2           
 kind: DaemonSet                    
@@ -351,3 +352,229 @@ spec:
       - name: main
         image: luksa/ssd-monitor
 ```
+
+En la definición podemos apreciar que ademas del selector tenemos un template. En el template declaramos los contenedores que constituyen el demonio.  
+
+Creamos el recurso de la forma estandard:  
+```
+kubectl create -f ssd-monitor-daemonset.yaml
+
+kubectl get ds
+
+kubectl get node
+
+kubectl label node minikube disk=ssd
+
+kubectl label node minikube disk=hdd --overwrite
+
+```
+# Jobs
+Los pods scheduleados con Resource Controllers, REsourcesets o Daemonsets tienen en comun que se ejecutan de forma initerrumpida. Si necesitamos ejecutar una tarea de forma puntual el recurso a utilizar es el Job.  
+```
+apiVersion: batch/v1                  
+kind: Job                             
+metadata:
+  name: batch-job
+spec:                                 
+  template:
+    metadata:
+      labels:                         
+        app: batch-job                
+    spec:
+      restartPolicy: OnFailure        
+      containers:
+      - name: main
+        image: luksa/batch-job
+```
+En el yaml del job podemos apreciar el template, que incluye los metadatos con las etiquetas, y la specificación en ``spec``. La especificación incluye el contenedor a ejecutar y la política de ejecución. Podemos ver los jobs con:  
+```
+kubectl get jobs
+
+```
+Podemos ver los pods como siempre. Solo un matiz, el pod dejara de ejecutarse cuando el job termine. Si queremos ver los pods terminados tenemos que añadir `` --show-all o -a``. El pod no se borra cuando el job termina, pero cambia su estado. Al no haberse borrado, podremos ver su log de ejecución:  
+```
+kubectl get po -a
+
+kubectl logs batch-job-28qf4
+```
+Podemos ver los jobs:  
+```
+kubectl get job
+```
+## Ejecución secuencial
+Si necesitamos ejecutar varias vece un job, una detras de otra:  
+```
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multi-completion-batch-job
+spec:
+  completions: 5
+  template:
+    ....
+```
+En la spec especificamos que se necesita realizar cinco ejecuciones.  
+## Ejecución en paralelo
+```
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multi-completion-batch-job
+spec:
+  completions: 5
+  parallelism: 2
+  template:
+    ...
+```
+Estamos diciendo que se pueden ejecutar dos jobs en paralelo. Esto significa que como hay que hacer cinco ejecuciones, se precisaran tres ciclos para terminar de ejecutar todos los jobs.  
+Podemos cambiar el grado de paralelismo con al propiead replicas:  
+```
+kubectl scale job multi-completion-batch-job --replicas 3
+```
+## Limitar el tiempo de ejecución de un Pod
+Podemos especificar el tiempo que tendra un job para ejecutarse por medio de la propiedad ``activeDeadlineSeconds`` en la spec del Pod. Si la ejecución supera este tiempo, Kubernetes tratara de matar el Pod.
+## Schedule un Job
+Podemos crear un cronJob:  
+```
+apiVersion: batch/v1beta1                  
+kind: CronJob
+metadata:
+  name: batch-job-every-fifteen-minutes
+spec:
+  schedule: "0,15,30,45 * * * *"           
+  jobTemplate:
+    spec:
+      template:                            
+        metadata:                          
+          labels:                          
+            app: periodic-batch-job        
+        spec:                              
+          restartPolicy: OnFailure         
+          containers:                      
+          - name: main                     
+            image: luksa/batch-job         
+```
+En la spec del cronJob estamos indicando la programación - con una expresión cron - y el template. En este ejemplo el job se ejecutar en los minutos 0, 15, 30 y 45 de cada hora.  
+Lo que sucedera es que el cronJob creara recursos de tipo Job, que a su vez crearan los Pods.  
+```
+apiVersion: batch/v1beta1                  
+kind: CronJob
+metadata:
+  name: batch-job-every-fifteen-minutes
+spec:
+  schedule: "0,15,30,45 * * * *"           
+  startingDeadlineSeconds: 15
+  jobTemplate:
+    spec:
+      template:                            
+        metadata:                          
+          labels:                          
+            app: periodic-batch-job        
+        spec:                              
+          restartPolicy: OnFailure         
+          containers:                      
+          - name: main                     
+            image: luksa/batch-job         
+```
+En este ejemplo estamos indicando que el job debe empezar a ejecutarse 15 segundos después del instante programado.  
+# Servicios
+Podemos definir un servicio con el siguiente yaml:
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia
+spec:
+  ports:
+  - port: 80                
+    targetPort: 8080        
+  selector:                 
+    app: kubia              
+```
+Lo que estamos haciendo es crear un servicio que se expondra en el puerto 80 y que se conectara con los Pods que tengan como etiqueta app:Kubia, por medio del puerto 8080.  
+```
+kubectl get svc
+
+NAME         CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+kubia        10.111.249.153   <none>        80/TCP    6m        
+```
+Este servicio solo sera accesible desde el cluster. Por ejemplo, desde cualquier contenedor del cluster podríamos hacer:  
+```
+kubectl exec kubia-7nog1 -- curl -s http://10.111.249.153
+```
+Lo que se indica despues de ``--`` en el comando es la instrucción que se ejecutar dentro  del contenedor.  
+## Session Afinity
+Podemos definir la afinidad del servicio. Hay dos posibles opciones:  
+- None. Ninguna. Es el valor por defecto  
+- ClienIP. Afinidad con la IP  
+```
+apiVersion: v1
+kind: Service
+spec:
+  sessionAffinity: ClientIP
+  ...
+```
+
+## Named ports
+Si en lugar de hardcodear el puerto definimos en el Pod un named port, podremos referirnos a él por nombre en la definición del servicio. Por ejemplo, en este Pod:  
+```
+kind: Pod
+spec:
+  containers:
+  - name: kubia
+    ports:
+    - name: http               
+      containerPort: 8080      
+    - name: https              
+      containerPort: 8443      
+```
+Hemos definido dos named ports. Ahora en la definición del servicio podemos usarlos:  
+```
+apiVersion: v1
+kind: Service
+spec:
+  ports:
+  - name: http              
+    port: 80                
+    targetPort: http        
+  - name: https             
+    port: 443               
+    targetPort: https       
+```
+Observese como el target port es una etiqueta, no un número.  
+## Service Discovery
+Podemos descubrir los servicios de dos formas diferentes:  
+- Usando variables de entorno  
+- Usando el DNS interno  
+
+### Variables de entorno
+Al crear un servicio se crean sendas variables de entorno para indicar la IP y el puerto del servicio. Estas variables de entorno estaran disponibles en los Pods - siempre y cuando el Pod se haya creado despues de haber creado el servicio; Si el Pod se hubiera creado antes del servicio, si borrasemos el Pod, cuando sea recreado por el controlador, las variables de entorno ya estaran disponibles.  
+```
+kubectl exec kubia-3inly env
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=kubia-3inly
+KUBERNETES_SERVICE_HOST=10.111.240.1
+KUBERNETES_SERVICE_PORT=443
+...
+```
+### DNS
+Podremos usar el FQDN para referirnos a un servicio:  
+```
+backend-database.default.svc.cluster.local
+```
+Aqui ``backend-database`` es el nombre del servicio, y el resto se corresponde con el dominio asociado al cluster. Esto significa que si dentro de un Pod quisieramos invocar al servicio, podríamos hacer:  
+```
+curl http://kubia.default.svc.cluster.local
+```
+Podemos omitir el dominio, porque Kubernetes configurara el ``hosts`` file de cada contendor:  
+```
+curl http://kubia
+
+cat /etc/resolv.conf
+
+search default.svc.cluster.local svc.cluster.local cluster.local ...
+
+```
+## Conectarse con Servicios fuera del Cluster
+## Exponer Servicios fuera del Cluster
