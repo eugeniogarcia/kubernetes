@@ -576,5 +576,303 @@ cat /etc/resolv.conf
 search default.svc.cluster.local svc.cluster.local cluster.local ...
 
 ```
-## Conectarse con Servicios fuera del Cluster
+## Conectarse con Servicios fuera del Cluster  
+Los servicios no se vinculan directamente a los Pods, hay un recurso entre medias, el Endpoint:
+```
+kubectl describe svc kubia
+
+
+Name:                kubia
+Namespace:           default
+Labels:              <none>
+Selector:            app=kubia                                          
+Type:                ClusterIP
+IP:                  10.111.249.153
+Port:                <unset> 80/TCP
+Endpoints:           10.108.1.4:8080,10.108.2.5:8080,10.108.2.6:8080    
+Session Affinity:    None
+```
+
+En este caso vemos que el recurso Endpoint contiene una relación de IPs, so las IPs que exponen los Pods. Las IPs aqui listadas se crean dínamicamente en funcion del selector especificado. El proxy service eligira una de estas IPs para conectarse con los Pods.  
+Si quisieramos hacer esto manualmente, tendriamos que crear el recurso Servicio y el recurso Endpoint.  El servicio lo creamos sin ningún selector:  
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service          
+spec:                             
+  ports:
+  - port: 80
+```
+Este servicio aceptara peticiones en el puerto 80. Tendremos que crear un Endpoint resource con el ___mismo nombre que el servicio___:  
+```
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-service      
+subsets:
+  - addresses:
+    - ip: 11.11.11.11         
+    - ip: 22.22.22.22         
+    ports:
+    - port: 80                
+```
+Nótese como el nombre de los dos recursos es el mismo. El efecto sera que cuando se se dirijan peticiones al servicio, el servicio las redijira a una de las dos IPs especificadas en el Endpoint.  
+Al crear el servicio manualmente tambien se crean las variables de entorno, como en cualquier servicio. Los tipos que podemos elegir al crear el servicio son los de siempre, ___ClusterIP___ y ___ClientIP___.  
+### Más de un puerto
+Podemos exponer el servicio atraves de más un puerto, y mapear el puerto a otro en el Pod:  
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia
+spec:
+  ports:
+  - name: http              
+    port: 80                
+    targetPort: 8080        
+  - name: https             
+    port: 443               
+    targetPort: 8443        
+  selector:                 
+    app: kubia              
+```
+Aquí estariamos exponiendo los puertos 80 y 443 en el servicio, y Kubernetes estaría dirigiendo las peticiones a los puertos 8080 y 8443 del Pod.  
+### Crear un alias para los servicio externos
+Al definir el servicio, en la definición del Endpoint podemos especifcar un fqdn en lugar de referirnos a las IPs:  
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service
+spec:
+  type: ExternalName                         1
+  externalName: someapi.somecompany.com      2
+  ports:
+  - port: 80
+```
+Este servicio estaría apuntando a un servicio externo - en lugar de a un Pod.  
 ## Exponer Servicios fuera del Cluster
+Hay tres formas de exponer los servicios a terceros:  
+- ___NodePort___. En cada nodo se define un puerto que estara mapeado al servicio.  
+- ___LoadBalancer___.  El servicio es expuesto através de un balancedor de carga dedicado, expuesto en una dirección IP pública.  
+- ___Ingress service___. En lugar de crear un Balanceador de carga para cada recurso con su propia IP, el Ingress Service expondrá todos los servicios del Cluster que necesitamos. Un solo recurso expone todos los servicios.  
+
+### Node Port
+Especificamos en la spec que el tipo es NodePort, e indicamos el puerto que se tiene que abrir en cada nodo, en este caso 30123, el target Port y el puerto.
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia-nodeport
+spec:
+  type: NodePort             
+  ports:
+  - port: 80                 
+    targetPort: 8080         
+    nodePort: 30123          
+  selector:
+    app: kubia
+```
+Podemos ver la información del servicio:  
+```
+$ kubectl get svc kubia-nodeport
+
+NAME             CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubia-nodeport   10.111.254.223   <nodes>       80:30123/TCP   2m
+```
+
+El servicio estara accessible en:  
+- 10.11.254.223:80  
+- IP del primer nodo:30123  
+- IP del segundo nodo:30123  
+- etc ...  
+
+Es decir, se puede acceder el servicio desde el propio cluster tal y como hemos descrito en las secciones anteriores, pero tambien es posible acceder al servicio desde el exterior, utilizando la IP del nodo. Cuando nos dirigimos al puerto indicado en cualquiera de los nodos, el servicio es ejecutado.  
+Nótese  que el external IP no esta informado.  
+### LoadBalancer
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia-loadbalancer
+spec:
+  type: LoadBalancer                
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: kubia
+```
+Con esta opción se creara un Balanceador de carga que se expondrá en una IP pública:  
+```
+kubectl get svc kubia-loadbalancer
+
+NAME                 CLUSTER-IP       EXTERNAL-IP      PORT(S)         AGE
+kubia-loadbalancer   10.111.241.153   130.211.53.173   80:32143/TCP    1m
+```
+Vemos como hay una IP asignada. Podriamos encontrar el balanceador en:  
+```
+curl http://130.211.53.173
+```
+El balanceador distribuira las peticiones entre los nodos, dirigiendolas a la IP del nodo y el puerto 32143.  
+Notese que en este caso no especificamos el perto del nodo en la especificación del servicio. Kubernetes selecciona un nodo al azar.  
+#### Additional hops
+Podemos hacer que una vez que las peticiones han sido dirigidas a un nodo determinado, subsecuentes peticiones que se tengan que hacer desde el servicio sean dirigidas al propio nodo:
+```
+spec:
+  externalTrafficPolicy: Local
+  ...
+```
+### Ingress service
+El ingress service hay que habilitarlo:  
+```
+minikube addons list
+- default-storageclass: enabled
+- kube-dns: enabled
+- heapster: disabled
+- ingress: disabled                
+- registry-creds: disabled
+- addon-manager: enabled
+- dashboard: enabled
+```
+El servicio de ingress no esta habilitado. Lo tenemos que habilitar:  
+```
+minikube addons enable ingress
+```
+El servicio ingress se habilita como un Pod más, pero dentro del namespace de Kubernetes:  
+```
+kubectl get po --all-namespaces
+
+NAMESPACE    NAME                            READY  STATUS    RESTARTS AGE
+default      kubia-rsv5m                     1/1    Running   0        13h
+default      kubia-fe4ad                     1/1    Running   0        13h
+default      kubia-ke823                     1/1    Running   0        13h
+kube-system  nginx-ingress-controller-gdts0  1/1    Running   0        18m
+```
+Una vez el servicio esta habilitado podemos crear recursos para ingress:  
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kubia
+spec:
+  rules:
+  - host: kubia.example.com               
+    http:
+      paths:
+      - path: /                           
+        backend:
+          serviceName: kubia-nodeport     
+          servicePort: 80                 
+```
+Aqui estamos creando una lista de paths a los que se podrán acceder por medio de ``http://kubia.example.com``:  
+
+```
+kubectl get ingresses
+
+NAME      HOSTS               ADDRESS          PORTS     AGE
+kubia     kubia.example.com   192.168.99.100   80        29m
+```
+Aqui el ingress service se ha mapeado al path root, pero podriamos:
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kubia
+spec:
+  rules:
+  - host: kubia.example.com
+      http:
+        paths:
+        - path: /kubia                
+          backend:                    
+            serviceName: kubia        
+            servicePort: 80           
+        - path: /foo                  
+          backend:                    
+            serviceName: bar          
+            servicePort: 80           
+```
+Ahora estamos exponiendo dos path resources en el ingress, que apuntan a dos servicios diferentes, utilizando el puerto 80:  
+- kubia.example.com/Kubia. Dirige las peticiones al servicio kubia  
+- kubia.example.com/foo. Dirige las peticiones al servicio bar  
+
+Otra opcion seria la de definir varios hostnames en el servicio ingress:  
+```
+spec:
+  rules:
+  - host: foo.example.com          
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: foo         
+          servicePort: 80
+  - host: bar.example.com          
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: bar         
+          servicePort: 80
+```  
+
+Ahora estamos exponiendo dos path resources en el ingress, que apuntan a dos servicios diferentes, utilizando el puerto 80:  
+- foo.example.com/. Dirige las peticiones al servicio kubia  
+- bar.example.com/. Dirige las peticiones al servicio bar  
+
+## Detefinir cuando un Pod estara listo - readiness probes- para recibir peticiones
+Podemos definir una sonda en los Pods que determine cuando el Pod esta listo para recibir peticiones. Que no este listo no implicara que Kubernetes lo mate - como sucede con los liveness probes. La sonda se puede definir de tres formas diferentes:  
+- ___Exec probe___. Se ejecuta un proceso dentro del Pod, y dependiendo del exit status, Kubernetes sabra si el Pod esta o no listo para recibir peticiones.    
+- ___HTTP GET probe___. Kubernetes hara una peticion http. Si el Pod responde con un 200 sera señal de que esta disponible.  
+- ___TCP Socket probe___. Se abre una conexión TCP con el puerto especificado del contenedor. Si la conexi'on se abre, siginifica que el contenedor esta listo.   
+
+Kubernetes podra esperar durante un tiempo preestablecido para realizar la primera comprobación, de modo que si se precisa algun start-up se haga. Despues Kubernetes hara invocaciones períodicas para comprobar que el contendor siga disponible.  
+```
+apiVersion: v1
+kind: ReplicationController
+...
+spec:
+  ...
+  template:
+    ...
+    spec:
+      containers:
+      - name: kubia
+        image: luksa/kubia
+        readinessProbe:           
+          exec:                   
+            command:              
+            - ls                  
+            - /var/ready          
+        ...
+```
+La sonda se comprueba períodicamente, por defecto, cada 10 segundos.  
+
+### Observar el estado de readiness
+
+```
+kubectl get po
+
+NAME          READY     STATUS    RESTARTS   AGE
+kubia-2r1qb   0/1       Running   0          1m
+kubia-3rax1   0/1       Running   0          1m
+kubia-3yw4s   0/1       Running   0          1m
+```
+## Servicio Headless
+Un servicio que no tiene asignada una IP en el cluster:  
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia-headless
+spec:
+  clusterIP: None                
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: kubia
+```
+# Almacenamiento de Disco en contenedores
