@@ -876,3 +876,327 @@ spec:
     app: kubia
 ```
 # Almacenamiento de Disco en contenedores
+Los tipos de almacenamiento que podemos asociar a un contenedor son:  
+
+- ___emptyDir___. Se monta un directorio vacio. Cada vez que se para el contenedor, los datos se pierden  
+- ___hostPath___. Se monta un directorio del propio nodo, que contendra los datos previamente ya existentes en el directorio  
+- ___gitRepo___. Se monta un directorio con el contenido de un repositorio de Git  
+- ___nfs___. Una unidad NFS montada en el Pod  
+- ___gcePersistentDisk___ (Google Compute Engine Persistent Disk), awsElasticBlockStore (Amazon Web Services Elastic Block Store Volume), azureDisk (Microsoft Azure Disk Volume)  
+-	___configMap, secret, downwardAPI___. Almacenientos usados de forma especial  
+-	___persistentVolumeClaim___  
+- ___cinder, cephfs, iscsi, flocker, glusterfs, quobyte, rbd, flexVolume, vsphere-Volume, photonPersistentDisk, scaleIO___. Used for mounting other types of network storage  
+
+## emptyDir
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune
+spec:
+  containers:
+  - image: luksa/fortune                   
+    name: html-generator                   
+    volumeMounts:                          
+    - name: html                           
+      mountPath: /var/htdocs               
+  - image: nginx:alpine                    
+    name: web-server                       
+    volumeMounts:                          
+    - name: html                           
+      mountPath: /usr/share/nginx/html     
+      readOnly: true                       
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes:                                 
+  - name: html                             
+    emptyDir: {}                           
+```
+Estamos especificando un volumen con el nombre html y de timpo emptyDir en el tag ``volumes`` del spec del Pod. Hay dos imagenes en las que haremos uso de este volumen. Lo indicamos usando el tag ``volumeMounts`` de la imagen. Estamos haciendo referencia al volumen html, e indicamos en que volumen se mapeara. El contenedor tendra esta ruta montaada en el filesystem. En este caso, los dos contenedores del Pod estan compartiendo el volumen - aunque cada uno lo ve en rutas diferentes.  
+En el ejemplo anterior el volumen se creo en el disco del nodo sobre el que corra el Pod. Podemos indicar que el disco se cree en memoria:  
+```
+volumes:
+  - name: html
+    emptyDir:
+      medium: Memory              
+```
+## gitRepo
+Si quisieramos que nuestro volumen contuviera al arrancar el Pod el contenido de un repositorio Git:  
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gitrepo-volume-pod
+spec:
+  containers:
+  - image: nginx:alpine
+    name: web-server
+    volumeMounts:
+    - name: html
+      mountPath: /usr/share/nginx/html
+      readOnly: true
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes:
+  - name: html
+    gitRepo:                                                           
+      repository: https://github.com/luksa/kubia-website-example.git   
+      revision: master                                                 
+      directory: .                                                     
+```
+En esencia desde el punto de vista de la spec de las Imagenes no cambia mucho, pero en la spec del volumen indicamos que se trata de un tipo ``getRepo``. Al ser de tipo getRepo tenemos que especificar cual es el repositorio, la branch que queremos utilizar y donde queremos volcar el contenido - en este ejemplo, en el raíz.  Al crear el Pod lo que se hace esencialmente es __clonar__ el repositorio.  
+
+En este ejemplo hemos introducido alguna propiedad más dentro de  spec de la image, para indicar como se comportara el volumen. En este caso hemos indicado que sea ``readOnly``. Hay otras propiedades con las que podemos controlar por ejemplo, si se aceptan lecturas simultaneas desde diferentes clientes, si se puede escribir, si pueden escribir uno o varios, etc.   
+### Sidecars
+Si una vez el Pod se ha creado, se cambiase algo en el repo, los datos no se sinronizaría. Si quisieramos mantenerlos sincronizados, podriamos crear un sidecar cuya misión sería precisamente la de mantener el repositorio "local" actualizado.  
+## hostPath  
+Con esta opción estamos apuntando a un directorio concreto del nodo - notese que no podemos anticipar en que nodo el Pod se va a ejecutar, ni si el Pod se movera en un momento dado de un nodo a otro.  
+Hay varios system Pods que utilizan este tipo de persistencia para cosas como guardar logs. Por ejemplo:    
+```
+kubectl get pod s --namespace kube-system
+
+NAME                          READY     STATUS    RESTARTS   AGE
+fluentd-kubia-4ebc2f1e-9a3e   1/1       Running   1          4d
+fluentd-kubia-4ebc2f1e-e2vz   1/1       Running   1          31d
+```
+Y ahora:
+```
+kubectl describe po fluentd-kubia-4ebc2f1e-9a3e --namespace kube-system
+
+Name:           fluentd-cloud-logging-gke-kubia-default-pool-4ebc2f1e-9a3e
+Namespace:      kube-system
+...
+Volumes:
+  varlog:
+    Type:       HostPath (bare host directory volume)
+    Path:       /var/log
+  varlibdockercontainers:
+    Type:       HostPath (bare host directory volume)
+    Path:       /var/lib/docker/containers
+```
+## Persistence storage
+Los tipos de volumenes descritos hasta el momento se caracterizaban por no garantizar el acceso a los datos desde el Pod. Bien eran no persistentes, o cuando lo eran, no podíamos garantizar que si el Pod era rescheduleado tuviera a acceso a los mismos datos. Si precisamos este tipo de persistencia podemos usar el almacenamiento ofrecido por Cloud Providers. Por ejemplo, veamos el caso de Google.  
+Podemos ver en Google cloud la lista de almacenamiento persistente usando el siguiente comando:  
+```
+gcloud container clusters list
+
+NAME   ZONE            MASTER_VERSION  MASTER_IP       ...
+kubia  europe-west1-b  1.2.5           104.155.84.137  ...
+```
+Ahora creamos un almacenamiento persistente llamado mongodb, con 1GB de espacio, y en la zona europa-west1-b:  
+```
+
+gcloud compute disks create --size=1GiB --zone=europe-west1-b mongodb
+
+WARNING: You have selected a disk size of under [200GB]. This may result in
+     poor I/O performance. For more information, see:
+     https://developers.google.com/compute/docs/disks#pdperformance.
+Created [https://www.googleapis.com/compute/v1/projects/rapid-pivot-
+     136513/zones/europe-west1-b/disks/mongodb].
+
+NAME     ZONE            SIZE_GB  TYPE         STATUS
+mongodb  europe-west1-b  1        pd-standard  READY
+```
+Una vez creado este almacenamiento, podemos utilizarlo en nuestro Pod - siempre que nuestro Kubernetes este ejecutandose en la Google Cloud:  
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+spec:
+  volumes:
+  - name: mongodb-data           
+    gcePersistentDisk:           
+      pdName: mongodb            
+      fsType: ext4               
+  containers:
+  - image: mongo
+    name: mongodb
+    volumeMounts:
+    - name: mongodb-data         
+      mountPath: /data/db        
+    ports:
+    - containerPort: 27017
+      protocol: TCP
+```
+En la sección ``volumes`` de nuestro ``spec`` indicamos que el tipo de gcePersistentDisk, y especificamos las propiedades asociadas a este persistent disk, esto es, su nombre y que tipo de Filesystem queremos montar en él - en este caso ext4.  
+
+Si ahora borrasemos el Pod, y luego lo volvieramos a crear, los datos volverían a estar disponibles en el Pod tal cual estaban antes de que lo mataramos:    
+```
+kubectl delete pod mongodb
+
+kubectl create -f mongodb-pod-gcepd.yaml
+```
+Si nuestro Cluster corriese en otro Cloud Provider, podríamos usar otro tipo de almacenamiento persistente. Por ejemplo, en AWS awsElasticBlockStore, en Azure azureDisk o azureFile.  
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+spec:
+  volumes:
+  - name: mongodb-data
+    awsElasticBlockStore:          
+      volumeId: my-volume          
+      fsType: ext4                 
+  containers:
+  - ...
+```
+## Volumen NFS
+Para usar un disco compartido:  
+```
+volumes:
+  - name: mongodb-data
+    nfs:                      
+      server: 1.2.3.4         
+      path: /some/path        
+```
+## Persistent Volume Claims (PVC)
+En todos los casos anteriores el propio desarrollador tenía que "buscarse la vida" para encontrar el espacio de disco que necesitaba para luego montarlo en su Pod. Con los PVC vamos a desacoplar la actividad del desarrollar - crear el Pod - con la actividad del system administrator - provisionar el espacio de disco.  
+
+El administrador creara ``Persistent Volumes`` o PC, y el desarrollador creará ``Persistent Volume Claims`` o PVC. En el Pod nos referiremos a la PVC.  
+
+### Persistent Volume
+El PV es un recurso Kubernetes más, y como tal se creara. En la spec del PV indicamos el espacio que tendra asociado, como se accedera a él, cual es la política de retención - que queremos que suceda cuando el Pod deje de usar el PV -, y el tipo de disco - en este ejemplo hemos especificado que sea un almacenamiento persistente de Google Cloud:  
+```
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+spec:
+  capacity:                                 
+    storage: 1Gi                            
+  accessModes:                              
+  - ReadWriteOnce                           
+  - ReadOnlyMany                            
+  persistentVolumeReclaimPolicy: Retain     
+  gcePersistentDisk:                        
+    pdName: mongodb                         
+    fsType: ext4                            
+```
+Una vez el recurso se haya creado:  
+```
+kubectl get pv
+
+NAME         CAPACITY   RECLAIMPOLICY   ACCESSMODES   STATUS      CLAIM
+mongodb-pv   1Gi        Retain          RWO,ROX       Available
+```
+Podemos observar que el el PV esta disponible y que no tiene ninguna "claim" en este momento.
+
+__NOTA:__ Los PV _no están asociados a ningun namespace_, esto es, estaran disponibles para cualquier Pod, independientemente de a que namespace pertenezcan.  
+### Persistent Volume Claim
+El PVC es otro tipo de recurso:  
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc              
+spec:
+  resources:
+    requests:                    
+      storage: 1Gi               
+  accessModes:                   
+  - ReadWriteOnce                
+  storageClassName : ""          
+```
+Tan pronto se ha creado un PVC, Kubernetes buscara una PV que sea "compatible" y lo vinculara.  
+```
+kubectl get pvc
+
+NAME          STATUS    VOLUME       CAPACITY   ACCESSMODES   AGE
+mongodb-pvc   Bound     mongodb-pv   1Gi        RWO,ROX       3s
+```
+Aqui podemos ver como nuestra PVC ya se ha vinculado - status ``Bound``-, y que se ha vinculado a "mongodb-pv". Los access modes son:  
+
+- _RWO—ReadWriteOnce_. Solo se puede leer/escribir desde un nondo; Solo un nodo podrá montar el volumen.  
+- _ROX—ReadOnlyMany_. Varios nodos pueden montar el volumen, pero solo para leer.
+- _RWX—ReadWriteMany_. Varios nodos pueden montar el volumen, y cada nodo puede leer y escribir.
+
+Si listamos ahora el PV:  
+```
+kubectl get pv
+
+NAME         CAPACITY   ACCESSMODES   STATUS   CLAIM                 AGE
+mongodb-pv   1Gi        RWO,ROX       Bound    default/mongodb-pvc   1m
+```
+Observamos que efectivamente ahora tiene asociada una Claim. Con la claim se indica también el namespace - esto porque el PV esta disponible en todos los namespaces.  
+
+Una vez hemos creado nuestro PVC, para utilizarla en un Pod:  
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+spec:
+  containers:
+  - image: mongo
+    name: mongodb
+    volumeMounts:
+    - name: mongodb-data
+      mountPath: /data/db
+    ports:
+    - containerPort: 27017
+      protocol: TCP
+  volumes:
+  - name: mongodb-data
+    persistentVolumeClaim:          
+      claimName: mongodb-pvc        
+```
+Podemos observar como el procedimiento es el mismo que con otros tipos de almacenamiento. En la sección ``volume`` de nuestro ``spec`` indicamos que queremos usar un ``persistentVolumeClaim`` y su nombre.  
+### Reciclar un PVC
+Si borrasemos nuestro Pod, y el PVC, que sucederia?:  
+```
+kubectl delete pod mongodb
+
+kubectl delete pvc mongodb-pvc
+```
+Si ahora recreasemos el PVC, y comprobasemos su estado:  
+```
+kubectl get pvc
+
+NAME           STATUS    VOLUME       CAPACITY   ACCESSMODES   AGE
+mongodb-pvc    Pending                                         13s
+```
+El PVC no esta disponible, ni se ha asociado automáticamente a un PV como hizo la primera vez. Si consultasemos el estado del PV:  
+```
+kubectl get pv
+
+NAME        CAPACITY  ACCESSMODES  STATUS    CLAIM               REASON AGE
+mongodb-pv  1Gi       RWO,ROX      Released  default/mongodb-pvc        5m
+```
+Vemos que el PV esta ahí, que sigue figurando la claim que tuvo al inicio, pero que el estado es ``Released``. Lo que sucede es qeu como indicamos una política de Retain en el PVC, cuando el PVC es eliminado los datos no se pierden. Al mismo tiempo, si al crear un PVC se volviese a bindear automáticamente, podría suceder que alguien que no deba vea los datos. Por ese motivo, cuando la política es ``Retain`` si bien los datos no se pierdem el PV no se vuelbe a bindear automaticamente con otro PVC.  
+
+Hay otras dos políticas disponibles:  
+- _Recycle_. Borra el contenido del PV, y lo pone de nuevo a disposición de cualquier PVC.
+- _Delete_. Borra el PV, incluyendo su contenido.  
+
+### Storage Class. Provisionamiento Dinámico
+En el mecanismo que acabamos de describir ya hay una separación de roles, por un lado el Adminsitrador encargado de crear los PV, y por otro lado el desarrollador encargado de crear los PVC. En este esquema el administrador sigue necesitando crear el persistent volume por anticipado, asi que se precisa una coordinación entre los dos roles, una coordinación para cada caso, para cada Pod que se necesite crear.  
+Hay un recurso, el Storage Class que simplifica la necesidad de coordinación. Se crea como cualquier otro recurso:  
+```
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+provisioner: kubernetes.io/gce-pd        
+parameters:
+  type: pd-ssd                           
+  zone: europe-west1-b                   
+```
+En el storage class tenemos que especificar el provisionador del almacenamiento. En este caso estamos usando el ``Google Compute Engine (GCE) Persistent Disk (PD) provisioner``. Esto obviamente significa que esta Storage Class solo puede ser creada cuando estemos usando Kubernetes en la Google Cloud. Ahora al crear el PVC podemos especificar la Storage Class - junto con nuestras necesidades de almacenamiento. El  
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  storageClassName: fast             
+  resources:
+    requests:
+      storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+```
