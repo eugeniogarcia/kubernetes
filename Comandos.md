@@ -1200,3 +1200,184 @@ spec:
   accessModes:
     - ReadWriteOnce
 ```
+Podemos ver como el pvc tiene ahora asociada la clase de almacenamiento:  
+```
+kubectl get pvc mongodb-pvc
+
+NAME          STATUS   VOLUME         CAPACITY   ACCESSMODES   STORAGECLASS
+mongodb-pvc   Bound    pvc-1e6bc048   1Gi        RWO           fast
+```
+Podemos observar como seguimos teniendo un PV detrás del PVC, solo que se ha creado automáticamente con la clase especificada:  
+```
+kubectl get pv
+
+NAME           CAPACITY  ACCESSMODES  RECLAIMPOLICY  STATUS    STORAGECLASS
+mongodb-pv     1Gi       RWO,ROX      Retain         Released
+pvc-1e6bc048   1Gi       RWO          Delete         Bound     fast
+```
+Como en este caso la clase esta configurada para utilizar el provisionador de Google, podemos ver que efectivamente se ha creado ``dinámicamente`` almacenamiento persistente en la cloud:  
+```
+gcloud compute disks list
+
+NAME                          ZONE            SIZE_GB  TYPE         STATUS
+gke-kubia-dyn-pvc-1e6bc048    europe-west1-d  1        pd-ssd       READY
+gke-kubia-default-pool-71df   europe-west1-d  100      pd-standard  READY
+ gke-kubia-default-pool-79cd   europe-west1-d  100      pd-standard  READY
+gke-kubia-default-pool-blc4   europe-west1-d  100      pd-standard  R EADY
+__mongodb__                       europe-west1-d  1        pd-standard  READY
+```
+
+__Nota__: Como las PVC se refieren al storageClass por nombre, si llevasemos nuestro PVC a otro cluster en el que existiese esta storageClass, el PVC seria valido. Esto es, con las storageClass conseguimos portabilidad entre clusters.  
+
+Podemos recuperar la lista de storageClaseses disponibles:  
+ ```
+kubectl get sc
+
+NAME                 TYPE
+fast                 kubernetes.io/gce-pd
+standard (default)   kubernetes.io/gce-pd
+```
+
+## Config Maps
+Podemos configurar contenedores de dos formas:  
+- Usando argumentos pasados por línea de comandos.
+- Usando variables de entorno.
+
+### Argumentos
+Supongamos que tenemos el siguiente script:  
+```
+#!/bin/bash
+trap "exit" SIGINT
+INTERVAL=$1
+echo Configured to generate new fortune every $INTERVAL seconds
+mkdir -p /var/htdocs
+while :
+do
+  echo $(date) Writing fortune to /var/htdocs/index.html
+  /usr/games/fortune > /var/htdocs/index.html
+  sleep $INTERVAL
+done
+```
+
+Tomamos el valor de ``INTERVAL`` del primer argumento de la línea de comandos. Ahora hagamos una imagen Docker con este script:  
+```
+FROM ubuntu:latest
+RUN apt-get update ; apt-get -y install fortune
+ADD fortuneloop.sh /bin/fortuneloop.sh
+ENTRYPOINT ["/bin/fortuneloop.sh"]                 
+CMD ["10"]                                         
+```
+En este Dockerfile estamos creando una imagen basada en la última imagen de ubuntu, sobre la imagen hacemos un ``apt-get update`` y luego un ``apt-get -y install fortune`` para instalar la aplicación fortune. A continuación tomamos de nuestra máquina el script  ``fortuneloop.sh`` y lo copiamos en la imagen en la ruta ``/bin/fortuneloop.sh``. El script es el que hemos listado antes. A continuación definimos que aplicación sea la que se ejecute cuando el contenedor se cree a partir de esta imagen. Hemos indicado que sea ``/bin/fortuneloop.sh``. Finalmente especificamos cual sera el argumento por defecto, en caso de que no se pasara ninguno al arrancar el contenedor. En este caso será ``10``.  
+
+Lo que sucede aquí es que tenemos una imagen que ejecutar el script antes listado, y que tendrá como primer argumento, ``$1``, el valor 10 o el que especifiquemos por línea de comandos.  
+
+Construimos la imagen y la publicamos (kubctl tiene que descargar las imagenes de un repositorio):
+```
+docker build -t docker.io/luksa/fortune:args .
+
+docker push docker.io/luksa/fortune:args
+
+docker run -it docker.io/luksa/fortune:args
+```
+Podemos especificar los argumentos de la imagen al definir el Pod:  
+```
+kind: Pod
+spec:
+  containers:
+  - image: some/image
+    command: ["/bin/command"]
+    args: ["arg1", "arg2", "arg3"]
+```
+Por ejemplo, en nuestro caso:  
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune2s                    
+spec:
+  containers:
+  - image: luksa/fortune:args        
+    args: ["2"]                      
+    name: html-generator
+    volumeMounts:
+    - name: html
+      mountPath: /var/htdocs
+...
+```
+Hemos indicado nuestra imagen, y hemos pasado como argumento el valor 2; El contenedor se ejecutar con este valor y no con el defecto que especificamos con CMD en el Dockerfile.  
+
+### Variables de entorno
+Otra forma de configurar nuestro contenedor es con variables de entorno.  
+```
+#!/bin/bash
+trap "exit" SIGINT
+echo Configured to generate new fortune every $INTERVAL seconds
+mkdir -p /var/htdocs
+while :
+do
+  echo $(date) Writing fortune to /var/htdocs/index.html
+  /usr/games/fortune > /var/htdocs/index.html
+  sleep $INTERVAL
+done
+```
+Notese que en esta ocasión no hemos seteado el valor de la variable de entorno INTERVAL.  
+
+En la especificación del Pod podremos definir variables de entorno:  
+```
+kind: Pod
+spec:
+ containers:
+ - image: luksa/fortune:env
+   env:                            
+   - name: INTERVAL                
+     value: "30"                   
+   name: html-generator
+```
+### ConfigMaps
+Con configMaps podemos configurar listas de key/values que se pueden mapear al Pod bien como un volumen de disco más, o bien dando valores a variables de entorno o a argumentos. El configMap se puede construir con literales key/value, o bien especificando un archivo, en cuyo caso el nombre del archivo pasa a ser el Key, y el contenido del archivo - por ejemplo, un json - pasa a ser el valor.  
+
+Aqui creamos un configMap con una lista de valores:  
+```
+kubectl create configmap fortune-config --from-literal=sleep-interval=25
+```
+Crea un config map llamado ``fortune-config`` que tiene un key ``sleep-interval`` que toma el valor ``25``.  
+```
+kubectl create configmap myconfigmap
+   --from-literal=foo=bar --from-literal=bar=baz --from-literal=one=two
+```
+El config map es un recurso más:  
+```
+kubectl get configmap fortune-config -o yaml
+
+apiVersion: v1
+data:
+  sleep-interval: "25"                                  
+kind: ConfigMap                                         
+metadata:
+  creationTimestamp: 2016-08-11T20:31:08Z
+  name: fortune-config                                  
+  namespace: default
+  resourceVersion: "910025"
+  selfLink: /api/v1/namespaces/default/configmaps/fortune-config
+  uid: 88c4167e-6002-11e6-a50d-42010af00237
+```
+Podemos usar un yaml para crear el recurso:  
+```
+kubectl create -f fortune-config.yaml
+```
+Como indicabamos anteriormente, podemos hacer que el config map tenga el contenido de un archivo de configuración:  
+```
+kubectl create configmap my-config --from-file=config-file.conf
+```
+Esto creara un config map con una key ``config-file.conf`` que tendra como valor el contenido del archivo. Si tuvieramos varios archivos, en lugar de ejecutar insrtrucción uno por uno, podemos crear el config map con todos los archivos de un directorio:  
+```
+kubectl create configmap my-config --from-file=/path/to/dir
+```
+Por supuesto siempre podemos hacerlo archivo a archivo:  
+```
+kubectl create configmap my-config
+   --from-file=foo.json                     
+   --from-file=bar=foobar.conf              
+   --from-file=config-opts/                 
+   --from-literal=some=thing                
+```
