@@ -1381,3 +1381,20 @@ kubectl create configmap my-config
    --from-file=config-opts/                 
    --from-literal=some=thing                
 ```
+### Usar un ConfigMap en un contenedor
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-env-from-configmap
+spec:
+  containers:
+  - image: luksa/fortune:env
+    env:                             1
+    - name: INTERVAL                 1
+      valueFrom:                     2
+        configMapKeyRef:             2
+          name: fortune-config       3
+          key: sleep-interval        4
+...
+```
