@@ -1382,6 +1382,8 @@ kubectl create configmap my-config
    --from-literal=some=thing                
 ```
 ### Usar un ConfigMap en un contenedor
+#### ConfigMap con una variable de entorno
+Podemos asignar el valor de un configMap a una variable de entorno:  
 ```
 apiVersion: v1
 kind: Pod
@@ -1390,11 +1392,116 @@ metadata:
 spec:
   containers:
   - image: luksa/fortune:env
-    env:                             1
-    - name: INTERVAL                 1
-      valueFrom:                     2
-        configMapKeyRef:             2
-          name: fortune-config       3
-          key: sleep-interval        4
+    env:                             
+    - name: INTERVAL                 
+      valueFrom:                     
+        configMapKeyRef:             
+          name: fortune-config       
+          key: sleep-interval
+          optional: true        
 ...
 ```
+Hemos establecido que se usara el configMap ``fortune-config`` y que usaremos la key ``sleep-interval``. Con ``optional`` podemos indicar si el valor es opcional. Podemos asignar valores a mas de una variable de entorno a la vez:  
+```
+spec:
+  containers:
+  - image: some-image
+    envFrom:                      
+    - prefix: CONFIG_             
+      configMapRef:               
+        name: my-config-map       
+...
+```  
+Usamos ``envFrom`` en lugar de ``env``. Todas los keys del configMap se crearan como variables de entorno. La variable de entorno tendra el mismo nombre de la key, bueno, en este caso con el prefijo CONFIG_. Solo __hacer una salvedad__, si el nombre de una key no es un nombre válido para una variable de entorno, Kubernetes la ignorara.  
+#### ConfigMap con un volumen
+Podemos crear un volumen que se mapee a un configMap. Cuando el contenedor quiera acceder al volumen lo que vera es el contenido del confMap, esto es, sus claves figuraran como archivos, y el contenido sera el de sus valores:  
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-configmap-volume
+spec:
+  containers:
+  - image: nginx:alpine
+    name: web-server
+    volumeMounts:
+    ...
+    - name: config
+      mountPath: /etc/nginx/conf.d      
+      readOnly: true
+    ...
+  volumes:
+  ...
+  - name: config
+    configMap:                          
+      name: fortune-config              
+  ...
+```
+Si nos interesase exponer todas las entradas del configMap podemos añadir la propiedad items. Con items estamos diciendo que entradas serán expuestas:    
+```
+volumes:
+  - name: config
+    configMap:
+      name: fortune-config
+      items:                             
+      - key: my-nginx-config.conf        
+        path: gzip.conf                  
+```
+__Nota:__ Podemos refrescar el contenido de un configMap e inmediatamente el configMap con los nuevos valores estara disponible en el contenedor. Eso si, será responsabilidad del contenedor refrescar - releer - el configMap.  
+## Secrets
+Cuando los valores de configuración que necesitamos guardar corresponden con información confidencial, Kubernetes nos ofrece la posibilidad de usar Secrets. Con Secrets los valores solo se distribuyen a los nodos que lo necesitan, y solamente estan cargados en memoria, nunca se guardan en disco. Los valores se guardan en el Mater node, en el ectd encriptados - desde la versión 1.7 de kubernetes.  
+```
+kubectl get secrets
+
+
+NAME                  TYPE                                  DATA      AGE
+default-token-cfee9   kubernetes.io/service-account-token   3         39d
+```
+Podemos ver los detalles:  
+```
+kubectl describe secrets
+
+
+Name:        default-token-cfee9
+Namespace:   default
+Labels:      <none>
+Annotations: kubernetes.io/service-account.name=default
+             kubernetes.io/service-account.uid=cc04bb39-b53f-42010af00237
+Type:        kubernetes.io/service-account-token
+
+Data
+====
+ca.crt:      1139 bytes                                   
+namespace:   7 bytes                                      
+token:       eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...      
+```
+Podemos crear un secret como cualquier otro recurso:  
+```
+kubectl create secret generic fortune-https --from-file=https.key
+   --from-file=https.cert --from-file=foo
+```
+En este ejemplo hemos creado un secret con tres entradas, y ambas entradas se toman de tres archivos. Si vieramos la configuración de este recurso:  
+```
+kubectl get secret fortune-https -o yaml
+
+
+apiVersion: v1
+data:
+  foo: YmFyCg==
+  https.cert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCekNDQ...
+  https.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcE...
+kind: Secret
+```
+Observese como tenemos los tres valores - como habríamos visto de haberlo creadon en un configMap - pero los valores están códificados en ``base64``. Usar base64 no es precisamente guardar valores encriptados, pero nos permite que el valor guardado sea un valor ``binario``. Si quisieramos guardar un valor sin codificar en base64 en un secret, tambien se puede hacer:  
+```
+kind: Secret
+apiVersion: v1
+stringData:                                    1
+  foo: plain text                              2
+data:
+  https.cert: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCekNDQ...
+  https.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcE...
+```
+Basta con usar la propiedad ``stringData`` en lugar de ``data``.  
+## Metadatos. Downward api
