@@ -1505,3 +1505,155 @@ data:
 ```
 Basta con usar la propiedad ``stringData`` en lugar de ``data``.  
 ## Metadatos. Downward api
+La downward api nos proporciona información sobre el entorno en el que Kubernetes esta ejecutandose. __No es un REST endpoint__, es más bien un volumen en el que tendremos acceso a metadata del entorno. La información que nos brinda es la siguiente:  
+-	The pod’s name
+-	The pod’s IP address
+-	The namespace the pod belongs to
+-	The name of the node the pod is running on
+-	The name of the service account the pod is running under
+-	The CPU and memory requests for each container
+-	The CPU and memory limits for each container
+-	The pod’s labels
+-	The pod’s annotations
+
+
+### Exponer los medatos en variables de entorno
+Vemos como exponer todas estas propiedades atraves de variables de entorno:  
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward
+spec:
+  containers:
+  - name: main
+    image: busybox
+    command: ["sleep", "9999999"]
+    resources:
+      requests:
+        cpu: 15m
+        memory: 100Ki
+      limits:
+        cpu: 100m
+        memory: 4Mi
+    env:
+    - name: POD_NAME
+      valueFrom:                                   
+        fieldRef:                                  
+          fieldPath: metadata.name                 
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: SERVICE_ACCOUNT
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.serviceAccountName
+    - name: CONTAINER_CPU_REQUEST_MILLICORES
+      valueFrom:                                   
+        resourceFieldRef:                          
+          resource: requests.cpu                   
+          divisor: 1m                              
+    - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
+      valueFrom:
+        resourceFieldRef:
+          resource: limits.memory
+          divisor: 1Ki
+```
+En el caso de los recursos, CPU y Memoria, especificamos tambien un divisor. Lo que medimos en CPU son los miliseconds por core. En memoria memory limits/request (ver más adelante el significado). Los valores adminisbles para el divisor de memoria son: 1 (byte), 1k (kilobyte) or 1Ki (kibibyte), 1M (megabyte) or 1Mi (mebibyte), ...  
+
+Si consultamos ahora las variables de entorno de nuestro pod:  
+```
+kubectl exec downward env
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=downward
+CONTAINER_MEMORY_LIMIT_KIBIBYTES=4096
+POD_NAME=downward
+POD_NAMESPACE=default
+POD_IP=10.0.0.10
+NODE_NAME=gke-kubia-default-pool-32a2cac8-sgl7
+SERVICE_ACCOUNT=default
+CONTAINER_CPU_REQUEST_MILLICORES=15
+KUBERNETES_SERVICE_HOST=10.3.240.1
+KUBERNETES_SERVICE_PORT=443
+...
+```
+### Exponer los medatos en un volumen
+Podemos definir un pod con un volumen que exponga como items los metadatos ofrecidos por la downward api. Las imagenes definidas en la spec del pod podran entonces montar como volumenes el contenido de la downward api:     
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward
+  labels:                                     
+    foo: bar                                  
+  annotations:                                
+    key1: value1                              
+    key2: |                                   
+      multi                                   
+      line                                    
+      value                                   
+spec:
+  containers:
+  - name: main
+    image: busybox
+    command: ["sleep", "9999999"]
+    resources:
+      requests:
+        cpu: 15m
+        memory: 100Ki
+      limits:
+        cpu: 100m
+        memory: 4Mi
+    volumeMounts:                             
+    - name: downward                          
+      mountPath: /etc/downward                
+  volumes:
+  - name: downward                            
+    downwardAPI:                              
+      items:
+      - path: "podName"                       
+        fieldRef:                             
+          fieldPath: metadata.name            
+      - path: "podNamespace"
+        fieldRef:
+          fieldPath: metadata.namespace
+      - path: "labels"                            
+        fieldRef:                                 
+          fieldPath: metadata.labels              
+      - path: "annotations"                       
+        fieldRef:                                 
+          fieldPath: metadata.annotations         
+      - path: "containerCpuRequestMilliCores"
+        resourceFieldRef:
+          containerName: main
+          resource: requests.cpu
+          divisor: 1m
+      - path: "containerMemoryLimitBytes"
+        resourceFieldRef:
+          containerName: main
+          resource: limits.memory
+          divisor: 1
+```
+Asi por ejemplo, ``/etc/downward/podName`` sera un archivo disponible en la imagen que contendra el nombre del pod. Si listamos el volumen del pod veriamos:  
+```
+kubectl exec downward ls -lL /etc/downward
+
+-rw-r--r--   1 root   root   134 May 25 10:23 annotations
+-rw-r--r--   1 root   root     2 May 25 10:23 containerCpuRequestMilliCores
+-rw-r--r--   1 root   root     7 May 25 10:23 containerMemoryLimitBytes
+-rw-r--r--   1 root   root     9 May 25 10:23 labels
+-rw-r--r--   1 root   root     8 May 25 10:23 podName
+-rw-r--r--   1 root   root     7 May 25 10:23 podNamespace
+```
+### Kubernetes API server
+Otra forma de obtener información de contexto es invocando a [la api de Kubernetes](KubernetesAPI.md).  
