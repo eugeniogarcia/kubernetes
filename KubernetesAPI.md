@@ -164,3 +164,56 @@ If you'd like to turn off curl's verification of the certificate, use
   the -k (or --insecure) option
 ```
 Esperado. Como se trata de una petición https se hace la validación del certificado y esta fallando. Podemos usar la opción -k como mostramos antes, o, __configurar el certificado__.  
+## Invocar a la api
+### Certificado
+En cada cluster de Kubernetes hay configurado un secreto que contiene el certificado que necesitamos utilizar, así como el token:  
+```
+/var/run/secrets/kubernetes.io/serviceaccount/.
+ca.crt    namespace    token
+```
+__Desde nuestro pod__ podemos ejecutar:
+```
+curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://kubernetes
+```
+Ahora el error que obtenemos ya no es relativo a la validación del certificado, pero un error de utenticación. Necesitamos pasar el token en la llamada.  
+Para evitar tener que especificar ``--cacert``  en todas las llamadas, podemos informar la variable de entorno ``CURL_CA_BUNDLE``:  
+```
+export CURL_CA_BUNDLE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+curl https://kubernetes
+```
+
+### Token
+Para especificar el token hay que pasar la cabecera ``Authorization``:  
+```
+TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+curl -H "Authorization: Bearer $TOKEN" https://kubernetes
+
+{
+  "paths": [
+    "/api",
+    "/api/v1",
+    "/apis",
+    "/apis/apps",
+    "/apis/apps/v1beta1",
+    "/apis/authorization.k8s.io",
+    ...
+    "/ui/",
+    "/version"
+  ]
+}
+```
+### namespace
+Algunas apis requiren como input el namespace en el que esta ejecutandose el Pod. El namespace es el tercero de los valores que podemos encontrar en el secret:  
+```
+NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+
+curl -H "Authorization: Bearer $TOKEN" https://kubernetes/api/v1/namespaces/$NS/pods
+
+
+{
+  "kind": "PodList",
+  "apiVersion": "v1",
+  ...
+```
