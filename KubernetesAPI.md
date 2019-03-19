@@ -3,23 +3,23 @@ En la sección anterios terminabamos hablando de la downward api - que no es un 
 
 Podemos ver donde esta expuesta la api preguntando por la información del cluster:  
 ```
-kubectl cluster-info
+# kubectl cluster-info
 
 Kubernetes master is running at https://192.168.99.100:8443
 ```
 El endpoint esta expuesto via https. Podemos tratar de acceder a él:  
 ```
-curl https://192.168.99.100:8443 -k
+# curl https://192.168.99.100:8443 -k
 ```
 La opción ``-k`` de curl hace que no se valide el certificado. Al ejecutar el comando anterior obtendremos un error de autorización, porque para consumir la api necesitamos un token. Podemos evitar la autorización si accedemos a la api por medio del proxy - que kubernetes instala en cada nodo:  
 ```
-kubectl proxy
+# kubectl proxy
 
 Starting to serve on 127.0.0.1:8001
 ```
 Ahora lo intentamos de nuevo:  
 ```
-curl localhost:8001
+# curl localhost:8001
 
 {
   "paths": [
@@ -37,7 +37,8 @@ curl localhost:8001
 ```
 Tenemos acceso a la Kubernetes API. Podemos observar que hay varios recursos disponibles - paths. Si por ejemplo lo intentamos con la /apis/batch:  
 ```
-curl http://localhost:8001/apis/batch
+# curl http://localhost:8001/apis/batch
+
 {
   "kind": "APIGroup",
   "apiVersion": "v1",
@@ -61,7 +62,8 @@ curl http://localhost:8001/apis/batch
 ```
 Seguimos:  
 ```
-curl http://localhost:8001/apis/batch/v1
+# curl http://localhost:8001/apis/batch/v1
+
 {
   "kind": "APIResourceList",              
   "apiVersion": "v1",
@@ -97,7 +99,8 @@ curl http://localhost:8001/apis/batch/v1
 ```
 Podemos consumir uno de los resources expuestos:  
 ```
-curl http://localhost:8001/apis/batch/v1/jobs
+# curl http://localhost:8001/apis/batch/v1/jobs
+
 {
   "kind": "JobList",
   "apiVersion": "batch/v1",
@@ -112,7 +115,7 @@ curl http://localhost:8001/apis/batch/v1/jobs
         "namespace": "default",
         ...
 ```
-## USar el API Server desde un Pod
+## Usar el API Server desde un Pod
 Creamos un pod de ejemplo para demostrar el uso del API server. El pod usa una imagen que monta curl:  
 ```
 apiVersion: v1
@@ -127,7 +130,7 @@ spec:
 ```
 Una vez hemos iniciado el Pod, podemos conectarnos con el - desde su bash - para probar la conectividad con el servidor de API:  
 ```
-kubectl exec -it curl bash
+# kubectl exec -it curl bash
 ```
 Para averiguar la IP del API server tenemos varias formas:  
 - Como el servidor de API se publica como servicio, podemos ver los datos del servicio  
@@ -136,7 +139,7 @@ Para averiguar la IP del API server tenemos varias formas:
 
 Vemos los servicios disponibles:  
 ```
-kubectl get svc
+# kubectl get svc
 
 NAME         CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 kubernetes   10.0.0.1     <none>        443/TCP   46d
@@ -144,7 +147,7 @@ kubernetes   10.0.0.1     <none>        443/TCP   46d
 ```
 Comprobemos que tenemos nuestras variables de entorno:  
 ```
-env | grep KUBERNETES_SERVICE
+# env | grep KUBERNETES_SERVICE
 
 KUBERNETES_SERVICE_PORT=443
 KUBERNETES_SERVICE_HOST=10.0.0.1
@@ -156,7 +159,7 @@ https://kubernetes
 ```
 Si ahora __desde el pod__ hacemos un curl:  
 ```
-curl https://kubernetes
+# curl https://kubernetes
 
 curl: (60) SSL certificate problem: unable to get local issuer certificate
 ...
@@ -168,27 +171,28 @@ Esperado. Como se trata de una petición https se hace la validación del certif
 ### Certificado
 En cada cluster de Kubernetes hay configurado un secreto que contiene el certificado que necesitamos utilizar, así como el token:  
 ```
-/var/run/secrets/kubernetes.io/serviceaccount/.
+# ls /var/run/secrets/kubernetes.io/serviceaccount/.
+
 ca.crt    namespace    token
 ```
 __Desde nuestro pod__ podemos ejecutar:
 ```
-curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://kubernetes
+# curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://kubernetes
 ```
 Ahora el error que obtenemos ya no es relativo a la validación del certificado, pero un error de utenticación. Necesitamos pasar el token en la llamada.  
 Para evitar tener que especificar ``--cacert``  en todas las llamadas, podemos informar la variable de entorno ``CURL_CA_BUNDLE``:  
 ```
-export CURL_CA_BUNDLE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+# export CURL_CA_BUNDLE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
-curl https://kubernetes
+# curl https://kubernetes
 ```
 
 ### Token
 Para especificar el token hay que pasar la cabecera ``Authorization``:  
 ```
-TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+# TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 
-curl -H "Authorization: Bearer $TOKEN" https://kubernetes
+# curl -H "Authorization: Bearer $TOKEN" https://kubernetes
 
 {
   "paths": [
@@ -207,9 +211,9 @@ curl -H "Authorization: Bearer $TOKEN" https://kubernetes
 ### namespace
 Algunas apis requiren como input el namespace en el que esta ejecutandose el Pod. El namespace es el tercero de los valores que podemos encontrar en el secret:  
 ```
-NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+# NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 
-curl -H "Authorization: Bearer $TOKEN" https://kubernetes/api/v1/namespaces/$NS/pods
+# curl -H "Authorization: Bearer $TOKEN" https://kubernetes/api/v1/namespaces/$NS/pods
 
 
 {
