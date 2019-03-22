@@ -260,8 +260,10 @@ El tamaño del historial se puede controlar con la propiedad ``revisionHistoryLi
 ## Ritmo del despliegue
 Hay dos propiedades que determinan "la dinámica" del despliegue:  
 - maxSurge. Define cuantos Pods por encima del target estamos dispuestos a asumir. Por defecto el valor es 25%  
-- maxUnavailable. Define cuantos Pods por debajo del target estamos dispuestos a asumir. Por defecto el valor es 25%
-![MaxMin.png](Imagenes\MaxMin.png)
+- maxUnavailable. Define cuantos Pods por debajo del target estamos dispuestos a asumir. Por defecto el valor es 25%  
+
+![MaxMin.png](Imagenes\MaxMin.png)  
+
 Estas propiedades se definen como parte del Rollout strategy, en el manifiesto del recurso:  
 ```
 spec:
@@ -270,4 +272,57 @@ spec:
       maxSurge: 1
       maxUnavailable: 0
     type: RollingUpdate
+```
+## Parar un despliegue
+Podemos detener momentaneamente un despliegue:  
+```
+$ kubectl set image deployment kubia nodejs=luksa/kubia:v4
+
+deployment "kubia" image updated
+
+
+$ kubectl rollout pause deployment kubia
+
+deployment "kubia" paused
+```
+De esta forma podemos hacer una ``canary release``. Podemos continuar con el despliegue:  
+```
+kubectl rollout resume deployment kubia
+```
+## Bloquear el despliegue de versiones "incorrectas"
+Podemos configurar un periódo mínimo para que el Pod que estamos desplegando pase a estar activo. Mientras que el Pod no este disponible no se continuará con el despliegue. Si la sonda de readiness empezara a fallar en el intervalo definido en ``minReadySeconds``, el despliegue se bloquea.  
+```
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: kubia
+spec:
+  replicas: 3
+  minReadySeconds: 10                 
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0               
+    type: RollingUpdate
+  template:
+    metadata:
+      name: kubia
+      labels:
+        app: kubia
+    spec:
+      containers:
+      - image: luksa/kubia:v3
+        name: nodejs
+        readinessProbe:
+          periodSeconds: 1          
+          httpGet:                  
+            path: /                 
+            port: 8080              
+```
+## Plazo para el despliegue
+Podemos definir un tiempo máximo en el que el despliegue debería terminar. El valor por defecto son 10 minutos.  
+
+## Abortar un despliegue
+```
+kubectl rollout undo deployment kubia
 ```
