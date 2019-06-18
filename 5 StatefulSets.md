@@ -357,7 +357,7 @@ var handler = function(request, response) {
 (...)
 
 ```
-## Node Faulures
+## Node Failures
 Antes de crear un Pod para reemplazar a otro, Kubernetes tiene que estar al 100% seguro de que el Pod que el Pod que va a reemplazar esta "muerto", porque de lo contrario terminaríamos con dos Pods con el mismo nombre y accediendo al mismo almacenamiento. Vamos a ver esto con un ejemplo. Para simular que el Pod está "muerto", vamos a deshabilitar su adaptador de red.  
 
 Nos conectamos al nodo via ssh:  
