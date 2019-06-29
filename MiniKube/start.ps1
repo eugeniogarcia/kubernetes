@@ -1,0 +1,1 @@
+minikube start --vm-driver hyperv —-cpus 4 —-memory=6144 --hyperv-virtual-switch "ParaMiniKube"
