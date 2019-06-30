@@ -1,31 +1,3 @@
-# Install
-
-- Create a "minikube" external Hyper-V virtual switch.
-- Put minikube.exe into a folder on a disk (e.g. k:\minikube).
-- Add the folder to PATH.
-- Create a folder on the same logical disk as the minikube.exe's folder (e.g. k:\minikube_home).
-- Set MINIKUBE_HOME env var to the folder in p. 4
-- CD to the minikube.exe's folder.
-
-# Start minikube
-//Without Hyper-V enabled
-minikube start 
-
-//With Hyper-v Enabled
-
-minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-switch="paraMiniKube" --v=7 --alsologtostderr
-
-minikube start --vm-driver="hyperv" --memory=4096 --cpus=4 --hyperv-virtual-switch="paraMiniKube" --v=7 
-
-//Check the status of the cluster
-
-kubectl cluster-info
-
-## NOTE
-An External vswitch has to be available. We can create that on the Hyper-V Manager application. We have to select the Virtual Switch Manager action. There we can create a new external switch using the WiFi NIC of the computer. 
-
-In this case i have named the virtual switch as paraMiniKube
-
 # Quickstart
 ## Run an application
 

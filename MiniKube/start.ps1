@@ -1,1 +1,1 @@
-minikube start --cpus 5 —-memory 8192 --vm-driver "hyperv" --hyperv-virtual-switch "ParaMiniKube"
+minikube start --memory=11264 --cpus=5 --vm-driver "hyperv" --hyperv-virtual-switch "ParaMiniKube" --disk-size=20g --extra-config=apiserver.enable-admission-plugins="LimitRanger,NamespaceExists,NamespaceLifecycle,ResourceQuota,ServiceAccount,DefaultStorageClass,MutatingAdmissionWebhook"
