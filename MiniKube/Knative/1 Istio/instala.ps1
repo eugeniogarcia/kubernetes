@@ -1,4 +1,4 @@
-kubectl apply --filename .\istio-1.0.7/istio-crds.yaml
+kubectl apply --filename ./istio-crds.yaml
 
 kubectl apply --filename ./istio.yaml
 
