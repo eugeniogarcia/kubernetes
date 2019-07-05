@@ -201,6 +201,78 @@ po/website-controller-1571685839-qzmg6   2/2       Running   1          5m
 ## Validating custom objects
 You may have noticed that you didn’t specify any kind of validation schema in the Website CustomResourceDefinition. __Users can include any field they want in the YAML of their Website object__. The API server doesn’t validate the contents of the YAML (except the usual fields like apiVersion, kind, and metadata).  
 
-Is it possible to add validation to the controller and prevent invalid objects from being accepted by the API server? It isn’t, because the API server first stores the object, then returns a success response to the client (kubectl), and only then notifies all the watchers (the controller is one of them). All the controller can really do is validate the object when it receives it in a watch event, and if the object is invalid, write the error message to the Website object (by updating the object through a new request to the API server). The user wouldn’t be notified of the error automatically. They’d have to notice the error message by querying the API server for the Website object. Unless the user does this, they have no way of knowing whether the object is valid or not.  
+Is it possible to add validation to the controller and prevent invalid objects from being accepted by the API server? It isn’t, because the API server first stores the object, then returns a success response to the client (kubectl), and only then notifies all the watchers (the controller is one of them). __All the controller can really do is validate the object when it receives it in a watch event, and if the object is invalid, write the error message to the Website object (by updating the object through a new request to the API server)__. __The user wouldn’t be notified of the error automatically__. They’d have to notice the error message by querying the API server for the Website object. Unless the user does this, they have no way of knowing whether the object is valid or not.  
 
-It isn’t ideal. You’d want the API server to validate the object and reject invalid objects immediately. Validation of custom objects was introduced in Kubernetes version 1.8 as an alpha feature.
+It isn’t ideal. You’d want the API server to validate the object and reject invalid objects immediately. Validation of custom objects was introduced in Kubernetes version 1.8 as an alpha feature. To have the API server validate your custom objects, you need to enable the CustomResourceValidation feature gate in the API server and specify a JSON schema in the CRD.  
+
+## Providing a custom API server for your custom objects
+A better way of adding support for custom objects in Kubernetes is to implement your own API server and have the clients talk directly to it. You can integrate your custom API server with the main Kubernetes API server, through API server aggregation. Clients can connect to the aggregated API and have their requests transparently forwarded to the appropriate API server. The client wouldn’t even be aware that multiple API servers handle different objects behind the scenes.  
+
+![CustomServer.png](.\Imagenes\CustomServer.png)
+
+You’d no longer need to create a CRD to represent those objects, because you’d implement the Website object type into the custom API server directly. Generally, each API server is responsible for storing their own resources.  
+
+### Registering a custom API server
+To add a custom API server to your cluster, you’d deploy it as a pod and expose it through a Service.  
+
+```
+apiVersion: apiregistration.k8s.io/v1beta1   1
+kind: APIService                             1
+metadata:
+  name: v1alpha1.extensions.example.com
+spec:
+  group: extensions.example.com              2
+  version: v1alpha1                          3
+  priority: 150
+  service:                                   4
+    name: website-api                        4
+    namespace: default                       4
+```  
+
+- 1 This is an APIService resource.
+- 2 The API group this API server is responsible for
+- 3 The supported API version
+- 4 The Service the custom API server is exposed through  
+
+After creating the APIService resource from the previous listing, __client requests sent to the main API server that contain any resource from the extensions.example.com API group and version v1alpha1 would be forwarded to the custom API server pod(s) exposed through the website-api Service__. 
+
+# Extending kubernetes with the kubernetes service catalog
+One of the first additional API servers that will be added to Kubernetes through API server aggregation is the Service Catalog API server. Service Catalog is a hot topic in the Kubernetes community. Currently, for a pod to consume a service someone needs to deploy the pods providing the service, a Service resource, and possibly a Secret so the client pod can use it to authenticate with the service.  
+
+“Hey, I need a PostgreSQL database. Please provision one and tell me where and how I can connect to it.” This will soon be possible through the Kubernetes Service Catalog.  
+
+The Service Catalog is a catalog of services. Users can browse through the catalog and provision instances of the services listed in the catalog by themselves without having to deal with Pods, Services, ConfigMaps, and other resources required. The Service Catalog introduces the following four generic API resources:  
+- A ClusterServiceBroker, which describes an (external) system that can provision services
+- A ClusterServiceClass, which describes a type of service that can be provisioned
+- A ServiceInstance, which is one instance of a service that has been provisioned
+- A ServiceBinding, which represents a binding between a set of clients (pods) and a ServiceInstance
+
+![ServiceCatalogue.png](.\Imagenes\ServiceCatalogue.png)  
+
+In a nutshell, a cluster admin creates a ClusterServiceBroker resource for each service broker whose services they’d like to make available in the cluster.  
+
+__Kubernetes then asks the broker for a list of services that it can provide and creates a ClusterServiceClass resource for each of them__.  
+
+When a user requires a service to be provisioned, they __create an ServiceInstance resource__ and then a __ServiceBinding to bind that Service-Instance to their pods__. Those pods are then injected with a Secret that holds all the necessary credentials and other data required to connect to the provisioned ServiceInstance.
+
+# Introducing the Service Catalog API server and Controller Manager
+Similar to core Kubernetes, the Service Catalog is a distributed system composed of three components:  
+- Service Catalog API Server
+- etcd as the storage
+- Controller Manager, where all the controllers run  
+
+The four Service Catalog–related resources we introduced earlier are created by posting YAML/JSON manifests to the API server. It then stores them into its own etcd instance or uses.  
+
+The controllers running in the Controller Manager are the ones doing something with those resources. They obviously talk to the Service Catalog API server. Those controllers don’t provision the requested services themselves. They leave that up to external service brokers, which are registered by creating ServiceBroker resources in the Service Catalog API.  
+
+A cluster administrator can register one or more external ServiceBrokers in the Service Catalog. Every broker must implement the OpenServiceBroker API.  
+
+The Service Catalog talks to the broker through that API. The API is relatively simple. It’s a REST API providing the following operations:  
+
+- Retrieving the list of services with GET /v2/catalog
+- Provisioning a service instance (PUT /v2/service_instances/:id)
+- Updating a service instance (PATCH /v2/service_instances/:id)
+- Binding a service instance (PUT /v2/service_instances/:id/service_bindings/:binding_id)
+- Unbinding an instance (DELETE /v2/service_instances/:id/service_bindings/:binding_id)
+- Deprovisioning a service instance (DELETE /v2/service_instances/:id)
+
