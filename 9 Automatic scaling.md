@@ -222,4 +222,8 @@ In this example, the HPA is configured to use the latencyMillis metric of the fr
 Because a node usually has more resources than a single pod requests, it should almost always be possible to scale a pod vertically, right?. Because a pod’s resource requests are configured through fields in the pod manifest, vertically scaling a pod would be performed by changing those fields. But, vertical pod autoscaling is still not available yet.  
 
 # Horizontal scaling of cluster nodes
-A new node will be provisioned if, after a new pod is created, the Scheduler can’t schedule it to any of the existing nodes. 
+A new node will be provisioned if, after a new pod is created, the Scheduler can’t schedule it to any of the existing nodes. The Cluster Autoscaler looks out for such pods and asks the cloud provider to start up an additional node. Cloud providers usually group nodes into groups (or pools) of same-sized nodes (or nodes having the same features).  
+
+When the new node starts up, the Kubelet on that node contacts the API server and registers the node by creating a Node resource.  
+
+The Cluster Autoscaler also needs to scale down the number of nodes when they aren’t being utilized enough. 
