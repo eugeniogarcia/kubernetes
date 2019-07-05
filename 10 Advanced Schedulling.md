@@ -241,6 +241,28 @@ spec:
       ...
 ```
 
+The listing shows that this Deployment will create pods that have a hard requirement to be deployed on the same node (specified by the topologyKey field) as pods that have the app=backend label 
+
 ![CoLocation.png](.\Imagenes\CoLocation.png)
 
-What’s interesting is that if you now delete the backend pod, the Scheduler will schedule the pod to node2 even though it doesn’t define any pod affinity rules itself (the rules are only on the frontend pods). This makes sense, because otherwise if the backend pod were to be deleted by accident and rescheduled to a different node, the frontend pods’ affinity rules would be broken.  
+```
+kubectl get po -o wide
+
+NAME                   READY  STATUS    RESTARTS  AGE  IP         NODE
+backend-257820-qhqj6   1/1    Running   0         8m   10.47.0.1  node2.k8s
+frontend-121895-2c1ts  1/1    Running   0         13s  10.47.0.6  node2.k8s
+frontend-121895-776m7  1/1    Running   0         13s  10.47.0.4  node2.k8s
+frontend-121895-7ffsm  1/1    Running   0         13s  10.47.0.8  node2.k8s
+frontend-121895-fpgm6  1/1    Running   0         13s  10.47.0.7  node2.k8s
+frontend-121895-vb9ll  1/1    Running   0         13s  10.47.0.5  node2.k8s
+```
+
+All the frontend pods were indeed scheduled to the same node as the backend pod.  
+
+What’s interesting is that if you now delete the backend pod, the Scheduler will schedule the pod to node2 even though it doesn’t define any pod affinity rules itself (_the rules are only on the frontend pods_). This makes sense, because otherwise if the backend pod were to be deleted by accident and rescheduled to a different node, the frontend pods’ affinity rules would be broken.  
+
+In the previous example, you used pod Affinity to deploy frontend pods onto the same node as the backend pods. You probably don’t want all your frontend pods to run on the same machine, but you’d still like to keep them close to the backend pod—for example, run them in the same availability zone.  
+
+![AfinityColoc.png](.\Imagenes\AfinityColoc.png)
+
+
