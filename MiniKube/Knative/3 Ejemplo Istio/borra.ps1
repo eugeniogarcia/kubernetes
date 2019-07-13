@@ -9,3 +9,5 @@ foreach ($b in $a){
 kubectl delete -f .\bookinfo.yaml
 
 kubectl delete -f .\httpbin.yaml
+
+kubectl delete -f .\fortio.yaml
