@@ -22,7 +22,7 @@ spec:
     route:
     - destination:
         host: productpage
-        subset: v1
+        subset: grupo1
         port:
           number: 9080
   - match:
@@ -33,7 +33,7 @@ spec:
     route:
     - destination:
         host: productpage
-        subset: v2
+        subset: grupo2
         port:
           number: 9080  
 ---
@@ -45,6 +45,16 @@ spec:
   hosts:
   - reviews
   http:
+  - match:
+      # Note that Istio doesn’t have any special, built-in understanding of user identity. This example is enabled by the fact that the productpage service adds a custom end-user header to all outbound HTTP requests to the reviews service.
+    - headers:
+        end-user:
+          exact: egsmartin
+    route:
+    - destination:
+        host: reviews
+        subset: v1
+    timeout: 0.5s
   - route:
     - destination:
         host: reviews
@@ -53,5 +63,30 @@ spec:
     - destination:
         host: reviews
         subset: v3
-      weight: 50		
+      weight: 50
 ---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - match:
+      # To test the Bookinfo application microservices for resiliency, inject a 7s delay between the reviews:v2 and ratings microservices for user nico. This test will uncover a bug that was intentionally introduced into the Bookinfo app.
+    - headers:
+        end-user:
+          exact: nico
+    route:
+    - destination:
+        host: ratings
+        subset: v1
+    fault:
+      delay:
+        percent: 100.0
+        fixedDelay: 7s
+  - route:
+    - destination:
+        host: ratings
+        subset: v1

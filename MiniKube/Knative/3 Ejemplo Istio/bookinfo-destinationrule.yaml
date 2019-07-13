@@ -31,8 +31,8 @@ spec:
     loadBalancer:
       simple: RANDOM
   subsets:
-  - name: v1
-  - name: v2
+  - name: grupo1
+  - name: grupo2
     trafficPolicy:
       loadBalancer:
         simple: ROUND_ROBIN
