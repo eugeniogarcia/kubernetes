@@ -1,0 +1,14 @@
+apiVersion: sources.eventing.knative.dev/v1alpha1
+kind: ContainerSource
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: time-eventsource
+spec:
+  image: docker.io/gswk/time-event-source:latest
+  args: 
+    - "--interval=1"
+  sink:
+    apiVersion: <api version>
+    kind: <kind>
+    name: <name>

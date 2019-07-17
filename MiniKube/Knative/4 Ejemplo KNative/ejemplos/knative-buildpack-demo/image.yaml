@@ -1,0 +1,15 @@
+apiVersion: build.pivotal.io/v1alpha1
+kind: Image
+metadata:
+  name: build-demo-image
+spec:
+  serviceAccount: build-bot
+  builderRef: buildpack-builder
+  image: docker.io/bryanfriedman/knative-buildpack-demo
+  cacheSize: "1.5Gi"
+  failedBuildHistoryLimit: 5
+  successBuildHistoryLimit: 5
+  source:
+    git:
+      url: https://github.com/gswk/knative-buildpack-demo.git
+      revision: master

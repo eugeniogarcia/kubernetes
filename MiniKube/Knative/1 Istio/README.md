@@ -15,3 +15,8 @@ Nos tiene que retornar:
 ```
 policy: enabled
 ```
+
+## Update
+He actualizado en istio.yaml, de modo que ya no es identico al que descargue de github. ¿Que he cambiado?:  
+- He cambiado el configmap para que la policy de inyectar contenedores este habilitada por defecto (lo que comentaba en el punto anterior)
+- El Horizontal Autoscaler para que el minimo de pods de Istio sea 1 en lugar de tres

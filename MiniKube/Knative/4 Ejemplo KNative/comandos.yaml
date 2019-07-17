@@ -1,0 +1,9 @@
+kubectl get configuration
+
+kubectl get revisions
+
+kubectl get routes
+
+kubectl get ksvc
+
+kubectl logs knative-helloworld-qfxxd-deployment-5b6449cf78-znnqg -c queue-proxy

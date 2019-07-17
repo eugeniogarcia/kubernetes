@@ -1,0 +1,27 @@
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: knative-function-demo
+  namespace: default
+spec:
+  runLatest:
+    configuration:
+      build:
+        serviceAccountName: build-bot
+        source:
+          git:
+            url: https://github.com/gswk/knative-function-demo.git
+            revision: master
+        template:
+          name: buildpacks-cnb
+          arguments:
+          - name: IMAGE
+            value: docker.io/gswk/knative-function-square-demo:latest
+      revisionTemplate:
+        metadata:
+          labels:
+            knative.dev/type: function
+        spec:
+          container:
+            image: docker.io/gswk/knative-function-square-demo:latest
+            imagePullPolicy: Always

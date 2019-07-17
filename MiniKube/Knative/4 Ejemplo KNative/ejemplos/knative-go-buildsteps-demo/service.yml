@@ -1,0 +1,38 @@
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: knative-go-buildsteps-demo
+  namespace: default
+spec:
+  runLatest:
+    configuration:
+      build:
+        serviceAccountName: build-bot
+        source:
+          git:
+            url: https://github.com/gswk/knative-go-buildsteps-demo
+            revision: master
+        
+        steps:
+        - name: go-build
+          image: gcr.io/cloud-builders/go
+          args:
+          - build
+          - -o
+          - /workspace/knative-go-buildsteps-demo
+          env:
+          - name: 'PROJECT_ROOT'
+            value: '/workspace'
+        
+        - name: container-build
+          image: gcr.io/kaniko-project/executor
+          args:
+          - --dockerfile=/workspace/Dockerfile
+          - --destination=docker.io/gswk/knative-go-buildsteps-demo:latest
+
+
+      revisionTemplate:
+        spec:
+          container:
+            image: docker.io/gswk/knative-go-buildsteps-demo:latest
+            imagePullPolicy: Always
