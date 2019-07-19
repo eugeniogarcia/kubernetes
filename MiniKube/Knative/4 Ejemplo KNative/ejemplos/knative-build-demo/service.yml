@@ -13,3 +13,5 @@ spec:
           container:
             image: docker.io/egsmartin/knative-helloworld:latest
             imagePullPolicy: Always
+            ports:
+              - containerPort: 8081

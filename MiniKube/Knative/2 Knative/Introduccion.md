@@ -202,8 +202,9 @@ metadata:
   name: build-bot
 secrets:
 - name: dockerhub-account
-```
+```  
 
+## Build resource
 Now we can procedd to build the software and create an image. We can use the `build` resource:  
 
 ```
@@ -261,3 +262,17 @@ kubectl apply -f https://raw.githubusercontent.com/knative/build-templates/maste
 ```
 
 Once the build pod does its job, in https://cloud.docker.com/repository/docker/egsmartin/knative-helloworld we would see the image published.  
+
+# KNative Eventing
+The loosely coupled nature of serverless fits an event-driven architecture as well. Rather than having our applications and functions worry about the logic of watching for these events, instead we can express interest in certain events and let Knative handle letting us know when they occur.  
+
+Knative provides a layer of abstraction that makes it easy to consume events. Instead of writing code specific to your message broker of choice, Knative simply delivers an “event.” Your application doesn’t have to care where it came from or how it got there, just simply that it happened.  
+
+## Sources
+Sources are the source of the events. The Knative teams have developed a number of Sources that are provided right out of the box:  
+- GCP PubSub. Subscribe to a topic in Google’s PubSub Service and listen for
+messages
+- Kubernetes Events. Events happening in the Kubernetes cluster.
+- GitHub. Events in a GitHub repository, such as pull requests, pushes, and creation of releases.
+- Container Source. Knative has a further abstraction, a Container Source. This allows you to easily create your own Event Source, packaged as a container.  
+
