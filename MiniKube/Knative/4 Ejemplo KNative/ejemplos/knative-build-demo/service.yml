@@ -3,22 +3,13 @@ kind: Service
 metadata:
   name: knative-build-demo
   namespace: default
+  annotations: 
+    build.knative.dev/docker-0: https://index.docker.io/v1/
 spec:
   runLatest:
     configuration:
-      build:
-        serviceAccountName: build-bot
-        source:
-          git:
-            url: https://github.com/gswk/knative-build-demo.git
-            revision: master
-        template:
-          name: kaniko
-          arguments:
-          - name: IMAGE
-            value: docker.io/gswk/knative-build-demo:latest
       revisionTemplate:
         spec:
           container:
-            image: docker.io/gswk/knative-build-demo:latest
+            image: docker.io/egsmartin/knative-helloworld:latest
             imagePullPolicy: Always

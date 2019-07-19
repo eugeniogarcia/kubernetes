@@ -96,7 +96,7 @@ Tambien podemos observar como esta ruta apunta a la ultima version de la COnfigu
 Podemos probar el Servicio haciendo un curl desde el exterior del cluster. EN este caso tengo un minikube sin un balanceador de carga. El `Istio-Ingress gateway` esta implementado como un `NodePort service` en el puerto 32745. Si la IP del nodo es 10.10.10.81:  
 
 ```
-curl -H "Host: knative-helloworld.default.example.com" http://10.10.10.81:32745 -v
+curl -H "Host: knative-helloworld.default.example.com" http://192.168.1.139:31659 -v
 ```
 
 ## Servicios
@@ -173,6 +173,8 @@ Stable Mode, it uses the 60-second window average to determine how it should sca
 These properties are configurable in a ConfigMap attached to the Autoscaler
 
 # KNative Build
+The example used in this section can be found in the folder `knative-build-demo`.  
+
 ## Service Accounts
 How do we reach out to services that require authentication at build-time? How do we pull code from a private Git repository or push container images to Docker Hub?. For this, we can leverage a combination of two Kubernetes-native components: 
 Secrets and Service Accounts.  
@@ -186,10 +188,76 @@ metadata:
     build.knative.dev/docker-0: https://index.docker.io/v1/
 type: kubernetes.io/basic-auth
 data:
-  # 'echo -n "egsmartin@gmail.com" | base64'
-  username: ZWdzbWFydGluQGdtYWlsLmNvbQ==
-  # 'echo -n "Pupa1511" | base64'
-  password: UHVwYTE1MTE=
+  # 'echo -n "egsmartin" | base64'
+  username: ZWdzbWFydGlu
+  password: VmVyYTE1MTE=
 ```
 
-Both the username and password are base64 encoded when passed to Kubernetes. We’re using basic-auth to authenticate against Docker Hub. Knative also ships with ssh-auth out of the box, allowing us to authenticate using an SSH private key if we would like to pull code from a private Git repository, for example.
+Both the username and password are base64 encoded when passed to Kubernetes. We’re using basic-auth to authenticate against Docker Hub. Knative also ships with ssh-auth out of the box, allowing us to authenticate using an SSH private key if we would like to pull code from a private Git repository, for example.  
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-bot
+secrets:
+- name: dockerhub-account
+```
+
+Now we can procedd to build the software and create an image. We can use the `build` resource:  
+
+```
+apiVersion: build.knative.dev/v1alpha1
+kind: Build
+metadata:
+  name: knative-build-demo
+spec:
+  serviceAccountName: build-bot
+  source:
+    git:
+      url: https://github.com/gswk/knative-build-demo.git
+      revision: master
+  template:
+    name: kaniko
+    arguments:
+    - name: IMAGE
+      value: docker.io/egsmartin/knative-helloworld:latest
+```
+
+This will use the `kaniko` template to create an image using the code in `https://github.com/gswk/knative-build-demo.git`, and then push the resulting image to `docker.io/egsmartin/knative-helloworld:latest`.  
+
+The build is performed by a job. We can see the progress of the build in this way:  
+
+```
+kubectl -n default logs knative-build-demo-pod-6a362d -c build-step-build-and-push
+```
+
+The kaniko template need a `DOCKERFILE` that has to be present in the git repository with the source code.  
+
+The kaniko template is as follows:  
+```
+apiVersion: build.knative.dev/v1alpha1
+kind: BuildTemplate
+metadata:
+  name: kaniko
+spec:
+  parameters:
+  - name: IMAGE
+    description: The name of the image to push
+  - name: DOCKERFILE
+    description: Path to the Dockerfile to build.
+    default: /workspace/Dockerfile
+  steps:
+  - name: build-and-push
+    image: gcr.io/kaniko-project/executor
+    args:
+    - --dockerfile=${DOCKERFILE}
+    - --destination=${IMAGE}
+```
+
+The kaniko template has to be installed in the cluster first:  
+```
+kubectl apply -f https://raw.githubusercontent.com/knative/build-templates/master/kaniko/kaniko.yaml
+```
+
+Once the build pod does its job, in https://cloud.docker.com/repository/docker/egsmartin/knative-helloworld we would see the image published.  
