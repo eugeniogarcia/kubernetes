@@ -1,0 +1,15 @@
+apiVersion: build.knative.dev/v1alpha1
+kind: Build
+metadata:
+  name: docker-build-template
+spec:
+  serviceAccountName: build-bot
+  source:
+    git:
+      url: https://github.com/eugeniogarcia/knative-hello.git
+      revision: master
+  template:
+    name: docker-build
+    arguments:
+    - name: IMAGE
+      value: docker.io/egsmartin/hello-nginx:latest

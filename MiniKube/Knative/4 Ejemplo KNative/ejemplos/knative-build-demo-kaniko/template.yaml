@@ -1,0 +1,20 @@
+apiVersion: build.knative.dev/v1alpha1
+kind: BuildTemplate
+metadata:
+  name: docker-build
+spec:
+  parameters:
+  - name: IMAGE
+    description: Where to publish the resulting image.
+  - name: DIRECTORY
+    description: The directory containing the build context.
+    default: workspace
+  - name: DOCKERFILE_NAME
+    description: The name of the Dockerfile
+    default: Dockerfile
+  steps:
+  - name: build-and-push
+    image: gcr.io/kaniko-project/executor:latest
+    args:
+    - --dockerfile=/${DIRECTORY}/${DOCKERFILE_NAME}
+    - --destination=${IMAGE}

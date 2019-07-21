@@ -1,0 +1,16 @@
+apiVersion: build.knative.dev/v1alpha1
+kind: Build
+metadata:
+  name: docker-build
+spec:
+  serviceAccountName: build-bot
+  source:
+    git:
+      url: https://github.com/eugeniogarcia/knative-hello.git
+      revision: master
+  steps:
+  - name: build-and-push
+    image: gcr.io/kaniko-project/executor:latest
+    args:
+    - --dockerfile=/workspace/Dockerfile
+    - --destination=docker.io/egsmartin/hello-nginx:latest

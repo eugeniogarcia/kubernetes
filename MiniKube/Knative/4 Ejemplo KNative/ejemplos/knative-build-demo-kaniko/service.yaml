@@ -11,7 +11,7 @@ spec:
       revisionTemplate:
         spec:
           container:
-            image: docker.io/egsmartin/knative-helloworld:latest
+            image: docker.io/egsmartin/hello-nginx:latest
             imagePullPolicy: Always
             ports:
               - containerPort: 8081

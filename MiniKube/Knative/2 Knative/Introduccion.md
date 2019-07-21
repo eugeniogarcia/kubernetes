@@ -93,7 +93,7 @@ En el caso anterior estamos creando una ruta con el nombre `knative-helloworld`,
 
 Tambien podemos observar como esta ruta apunta a la ultima version de la COnfiguration `knative-helloworld`, a la que estaria derivando el 100% del trafico.  
 
-Podemos probar el Servicio haciendo un curl desde el exterior del cluster. EN este caso tengo un minikube sin un balanceador de carga. El `Istio-Ingress gateway` esta implementado como un `NodePort service` en el puerto 32745. Si la IP del nodo es 10.10.10.81:  
+Podemos probar el Servicio haciendo un curl desde el exterior del cluster. EN este caso tengo un minikube sin un balanceador de carga. El `Istio-Ingress gateway` esta implementado como un `NodePort service` en el puerto 31659. Si la IP del nodo es 192.168.1.139:  
 
 ```
 curl -H "Host: knative-helloworld.default.example.com" http://192.168.1.139:31659 -v
@@ -276,3 +276,143 @@ messages
 - GitHub. Events in a GitHub repository, such as pull requests, pushes, and creation of releases.
 - Container Source. Knative has a further abstraction, a Container Source. This allows you to easily create your own Event Source, packaged as a container.  
 
+We are going to create an standard service that will become later on the sink of an stream flow. The service:  
+
+```
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: knative-eventing-demo
+spec:
+  runLatest:
+    configuration:
+      revisionTemplate:
+        spec:
+          container:
+            image: docker.io/gswk/knative-eventing-demo:latest
+```
+
+We can check that the service is operational:  
+
+```
+curl http://192.168.1.139:31659 -H "Host: knative-eventing-demo.default.example.com" -v -XPOST -d "Hola, amigos"
+```
+
+We can now set up the source of the stream. For the Kubernetes Event Source, we’ll need to create a Service Account that has permission to read the events happening inside of our Kubernetes cluster:  
+
+First we create a service account:  
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: events-sa
+  namespace: default
+```
+
+Now we create a role that has rights to consume Kubernetes events:  
+
+```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: event-watcher
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+```  
+
+Finally we bing the role to the account:  
+```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: k8s-ra-event-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: event-watcher
+subjects:
+- kind: ServiceAccount
+  name: events-sa
+  namespace: default
+```
+
+And finally we are going to create a __Source__:  
+
+```
+apiVersion: sources.eventing.knative.dev/v1alpha1
+kind: ApiServerSource
+metadata:
+  name: testevents
+  namespace: default
+spec:
+  serviceAccountName: events-sa
+  mode: Resource
+  resources:
+    - apiVersion: v1
+      kind: Event
+  sink:
+    apiVersion: eventing.knative.dev/v1alpha1
+    kind: Channel
+    name: knative-eventing-demo-channel
+```
+
+We are saying that this source is to be connected to a sink, a `Channel`.  
+
+## Channels
+While you can send events straight to a Service, this means it’s up to you to handle retry logic and queuing. And what happens when an event is sent to your Service and it happens to be down? What if you want to send the same events to multiple Services?.  
+
+Channels handle buffering and persistence. Channels are an abstraction between our code and the underlying messaging solution. something like Kafka and RabbitMQ, but in neither case are we writing code specific to either.
+
+```
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Channel
+metadata:
+  name: knative-eventing-demo-channel
+spec:
+  provisioner:
+    apiVersion: eventing.knative.dev/v1alpha1
+    kind: ClusterChannelProvisioner
+    name: in-memory
+```
+In this case we have created an inmemory-channel. As mentioned before, a big goal of eventing in Knative is that it’s completely abstracted away from the underlying infrastructure, and this means making the messaging service backing our Channels pluggable. This is done by implementations of the ClusterChannelProvisioner, a pattern for defining how Knative should communicate with our messaging services.  
+
+- in-memory-channel. Handled completely in-memory inside of our Kubernetes cluster
+and does not rely on a separate running service to deliver events. Great for development but is not recommended to be used in production
+- GCP PubSub
+- Kafka
+
+## Subscriptions
+We have our Event Source sending events to a Channel, and a Service ready to go to start processing them. Subscriptions are the glue between Channels and Services.  
+
+```
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Subscription
+metadata:
+  name: knative-eventing-demo-subscription
+spec:
+  channel:
+    apiVersion: eventing.knative.dev/v1alpha1
+    kind: Channel
+    name: knative-eventing-demo-channel
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1alpha1
+      kind: Service
+      name: knative-eventing-demo
+```
+
+# Buildpacks
+No he conseguido hacer funcionar estos BuildTemplates. El build template esta en:  
+
+```
+kubectl apply -f https://raw.githubusercontent.com/knative/build-templates/master/buildpacks/cf.yaml
+```
