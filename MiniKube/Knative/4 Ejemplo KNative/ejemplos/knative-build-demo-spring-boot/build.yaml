@@ -3,13 +3,13 @@ kind: Build
 metadata:
   name: jib
 spec:
-  serviceAccountName: knative-build
+  serviceAccountName: build-bot
   source:
     git:
-      url: https://github.com/dgageot/hello-jib.git
+      url: https://github.com/eugeniogarcia/knative-heroes.git
       revision: master
  
   steps:
   - name: build-and-push
-    image: gcr.io/cloud-builders/mvn
-    args: ["compile", "jib:build", "-Dimage=gcr.io/[PROJECT-NAME]/hello-jib"]
+    image: gcr.io/cloud-builders/mvn:latest
+    args: ["compile", "jib:build", "-Dimage=docker.io/egsmartin/hello-jib", "-DallowInsecureRegistries=true"]
