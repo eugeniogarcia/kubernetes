@@ -31,3 +31,5 @@ helm template install/kubernetes/helm/istio-init --name istio-init --namespace i
 kubectl get crds | grep 'istio.io\|certmanager.k8s.io' | wc -l
 
 helm template install/kubernetes/helm/istio --name istio --namespace istio-system --set gateways.istio-ingressgateway.type=NodePort --values install/kubernetes/helm/istio/values-istio-demo-auth.yaml | kubectl apply -f -
+
+kubectl label namespace default istio-injection=enabled
