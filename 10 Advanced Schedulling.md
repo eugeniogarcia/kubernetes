@@ -150,7 +150,7 @@ This is much more complicated than a simple node selector.
 
 Affinity currently only affects pod scheduling and never causes a pod to be evicted from a node. Eventually, Kubernetes will also support RequiredDuringExecution, which means that if you remove a label from a node, pods that require the node to have that label will be evicted from such a node.  
 
-![Afinity.png](.\Imagenes\Afinity.png)
+![Afinity.png](./Imagenes/Afinity.png)
 
 The biggest benefit of the newly introduced node affinity feature is the ability to specify which nodes the Scheduler should prefer when scheduling a specific pod. This is done through the `preferredDuringSchedulingIgnoredDuringExecution` field.  
 
@@ -196,7 +196,7 @@ spec:
 ```
 You’re defining a node affinity preference, instead of a hard requirement. If your cluster had many nodes, when scheduling the pods of the Deployment in the previous listing, the nodes would be split into four groups:  
 
-![AfinityExt.png](\Imagenes\AfinityExt.png)
+![AfinityExt.png](/Imagenes/AfinityExt.png)
 
 If you create this Deployment in your two-node cluster, you should see most (if not all) of your pods deployed to node1.  
 ```
@@ -243,7 +243,7 @@ spec:
 
 The listing shows that this Deployment will create pods that have a hard requirement to be deployed on the same node (specified by the topologyKey field) as pods that have the app=backend label 
 
-![CoLocation.png](.\Imagenes\CoLocation.png)
+![CoLocation.png](./Imagenes/CoLocation.png)
 
 ```
 kubectl get po -o wide
@@ -263,6 +263,6 @@ What’s interesting is that if you now delete the backend pod, the Scheduler wi
 
 In the previous example, you used pod Affinity to deploy frontend pods onto the same node as the backend pods. You probably don’t want all your frontend pods to run on the same machine, but you’d still like to keep them close to the backend pod—for example, run them in the same availability zone.  
 
-![AfinityColoc.png](.\Imagenes\AfinityColoc.png)
+![AfinityColoc.png](./Imagenes/AfinityColoc.png)
 
 

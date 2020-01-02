@@ -7,16 +7,16 @@ Un despliegue tipo tendra:
 Cuando necesitamos desplegar una nueva versión de los Pods, tenemos varias opciones:  
 - ___Big-Bang___. Cambiar el spec del Pod apuntado a la nueva versión de la imagen; Matar los Pods; El RC reconstruirá los Pods, esta vez con la nueva versión de las imagenes.  
 
-![Despliegue_Op1.png](Imagenes\Despliegue_Op1.png)
+![Despliegue_Op1.png](Imagenes/Despliegue_Op1.png)
 - ___Blue-Green___. Crear un nuevo Pod con la nueva versión de las imagenes, pero con una etiqueta diferente al Pod que queremos reemplazar; El nuevo Pod estara governado por un nuevo Resource Controller; El nuevo Resource Controller arrancara todos lo nuevos Pods; Cuando esten todos arrancados modificar el servicio para que use la nueva etiqueta; Matar l viejo Resource Controller - y Pods.  
 
-![Despliegue_Op2.png](Imagenes\Despliegue_Op2.png)
+![Despliegue_Op2.png](Imagenes/Despliegue_Op2.png)
 
 Con la primera opción, que puede ejecutarse de distintas formas (borrar todos, crear todos; Borrar uno a uno), podemos tener perdida de servicio. Con la segunda opción tendremos dos versiones de la aplicación dando servicio simultáneo a los clientes - puede haber casos en los que esto no sea soportado por la aplicación -  y una sobre-alocación de recursos.  
 
 Una opción intermedia en el sentido de que no se pierde el servicio sería hacer un ___Rolling-update___. En este caso se van introduciendo progresivamente los nuevos Pods - el servicio apunta a las dos etiquetas -. Progresivamente significa que el número de instancias obejetivo entre los dos Resource Controllers es el total de instancias que deseamos ejecutar, pero progresivamente el total de instancias en el "viejo" RC se reduce en la misma medida que se aumentan en el "nuevo" RC.  
 
-![Despliegue_Op3.png](Imagenes\Despliegue_Op3.png)
+![Despliegue_Op3.png](Imagenes/Despliegue_Op3.png)
 ## Image Tag
 Si el cambio en la aplicación que hemos descrito antes lo publicamos en una imagen que tiene el mismo ``tag`` que la imagen que estamos reemplazando, Kubernetes por defecto no identificara que la imagen a cambiado. Esto significa que siempre que Kubernetes schedule una Pod en un nodo en el que ya estuviera la imagen descargada - por ejemplo porque ya hubiera Pods corriendo con esa imagen en el nodo -, no se tomara la imagen actualizada. SI queremos que siempre se descargue una copia fresca de la imagen debemos setear la propiedad __imagePullPolicy__ del contenedor a ``Always``. El otro valor admisible para esta propiedad es ``IfNotPresent``.  
 
@@ -34,7 +34,7 @@ console.log("Kubia server starting...");
 var handler = function(request, response) {
   console.log("Received request from " + request.connection.remoteAddress);
   response.writeHead(200);
-  response.end("This is v1 running in pod " + os.hostname() + "\n");
+  response.end("This is v1 running in pod " + os.hostname() + "/n");
 };
 
 var www = http.createServer(handler);
@@ -92,7 +92,7 @@ This is v1 running in pod kubia-v1-2321o
 ```
 Si ahora quisieramos cambiar la versión de la aplicación - nodejs - para introducir el siguiente cambio:  
 ```
-response.end("This is v2 running in pod " + os.hostname() + "\n");
+response.end("This is v2 running in pod " + os.hostname() + "/n");
 ```
 
 Para hacer este despligue en modo Rolling Update de forma automática, hay un comando específico:  
@@ -106,7 +106,7 @@ Scaling up kubia-v2 from 0 to 3, scaling down kubia-v1 from 3 to 0 (keep 3
 ```
 Los argumentos son el nombre del RC "viejo", el nombre del RC "nuevo", y la imagen que debe introducirse en los nuevos Pods. Inicialmente tendremos la siguiente foto:  
 
-![RollingUpdate.png](Imagenes\RollingUpdate.png)
+![RollingUpdate.png](Imagenes/RollingUpdate.png)
 En este __instante__ la definición del RC será:  
 ```
 kubectl describe rc kubia-v2
@@ -138,10 +138,10 @@ kubia-v1-cdtey  1/1    Running  0         2m   app=kubia,deployment=3ddd...
 ```
 De esta forma el "nuevo" RC no apunta a los Pods porque no tiene la nueva etiqueta, mientras que el "viejo" RC sigue apuntando a los Pods:  
 
-![RollingUpdateStart.png](Imagenes\RollingUpdateStart.png)
+![RollingUpdateStart.png](Imagenes/RollingUpdateStart.png)
 Todo esto sucede antes de que haya empezado el proceso de escalado. A continuación Kubernetes incrementara el escalado en el nuevo RC en uno, y lo disminuira en uno en el viejo RC. Como el servicio solo tiene como selector la etiqueta "original", no esta "generada", las peticiones dirigidas al servicio se enrutaran a los Pods gestionados __por ambos RC__, con lo que estaremos sirviendo a los clientes con las dos versiones del Pod:  
 
-![RollingUpdateMid.png](Imagenes\RollingUpdateMid.png)  
+![RollingUpdateMid.png](Imagenes/RollingUpdateMid.png)  
 
 Finalmente el proceso terminara:  
 ```
@@ -234,7 +234,7 @@ Esto si probocaría un cambio en la aplicación.
 
 ### Progreso
 Cuando cambiamos la imagen de uno de los contenedores, el Deployment creara un nuevo RS, como hacíamos en el rolling-update, e ira escalandolo hasta llegar al estado final:  
-![Deployment.png](Imagenes\Deployment.png)  
+![Deployment.png](Imagenes/Deployment.png)  
 
 El antiguo RS __no es eliminado__.
 ## Rollout
@@ -255,14 +255,14 @@ Para ello cuando creamos el despliegue tenemos que usar la opción ``--record``.
 ```
 kubectl rollout undo deployment kubia --to-revision=1
 ```
-![Rollback.png](Imagenes\Rollback.png)
+![Rollback.png](Imagenes/Rollback.png)
 El tamaño del historial se puede controlar con la propiedad ``revisionHistoryLimit`` del Deployment.
 ## Ritmo del despliegue
 Hay dos propiedades que determinan "la dinámica" del despliegue:  
 - maxSurge. Define cuantos Pods por encima del target estamos dispuestos a asumir. Por defecto el valor es 25%  
 - maxUnavailable. Define cuantos Pods por debajo del target estamos dispuestos a asumir. Por defecto el valor es 25%  
 
-![MaxMin.png](Imagenes\MaxMin.png)  
+![MaxMin.png](Imagenes/MaxMin.png)  
 
 Estas propiedades se definen como parte del Rollout strategy, en el manifiesto del recurso:  
 ```

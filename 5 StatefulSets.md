@@ -12,7 +12,7 @@ Lo que caracteriza a un Stateful Pod es:
 ## Identidad
 Necesitaremos poder localizar el Pod en una dirección que no cambie cuando el Pod se schedulea en otro nod. El servicio nos ofrece esta capacidad, pero el servicio sirve a más de un Pod. Si crearamos un servicio por cada Pod funcionaria, pero seria dificil de manejar. Tendriamos un RS y un servicio por Pod, con lo cual tendriamos que tener una etiqueta especifica con cada Pod:  
 
-![manualstatefull.png](Imagenes\manualstatefull.png)
+![manualstatefull.png](Imagenes/manualstatefull.png)
 
 ## Almacenamiento
 Aquí lo tenemos también dificil. Si en el Pod tenemos almacenamiento persistente y queremos que este disponible independientemente del nodo, usaremos un PV y un PVC. El problema esta en que el PVC se asocia al Pod template, con lo cual todas las instancias del Pod compartirían el mismo almacenamiento. Si quisieramos asignar un PV a un Pod concreto, tendríamso que tener distintos Pod templates - y cada uno en su propio RS.
@@ -24,13 +24,13 @@ El Statefulset es un __recurso__ que nos proporciona esta funcionalidad que busc
 
 Cuando un Pod stateful muere, necesitamos que se reconstruya con la misma identidad, y con los mismos datos - estado -, y con el mismo nombre, aunque el scheduler lo resurrecte en otro nodo. Esto se consigue gracias a que el todos los Pods creados con este __tienen un nombre previsible__. En esta imagen podemos ver en la izquierda un RS y un set de Pods tradicionales, y en la derecha podemos ver el equivalente creados con un Statefulset:  
 
-![PodsEnStatefulSets.png](Imagenes\PodsEnStatefulSets.png)  
+![PodsEnStatefulSets.png](Imagenes/PodsEnStatefulSets.png)  
 
 Podemos ver como el nombre de los Pods en la derecha tiene un nombre __previsible__. Tanto es así que si un nodo muere y se crea otro para sustituirle, el Pod que se creara tendra exactamente el mismo nombre - , y tendrá los mismos datos asociados como veremos a continuación.  
 
 Cundo se reduce el numero de instancias en el RS creado con este recurso, tambie es previsbible como se va a hacer. Se empezará eliminando los Pods que se crearon en último lugar. Además, cuando se reduce el numero de instancias en más de una, los Pods se iran eliminado uno a uno, de forma secuencial. Esto se hace asi porque hay aplicaciones stateful que no aceptan facilmente la caida de varios modulos. Por ejemplo, supongamos que nuestros Pods implementan un cluster de Kafka. Cuando un nodo se elimine, los logs replicados en el nodo caido tendran que se ser replicados en otros. Si muriesen más de un nodo a la vez podría suceder que alguna de las replicas se perdieran.  
 
-![EscaladoStateful.png](Imagenes\EscaladoStateful.png)  
+![EscaladoStateful.png](Imagenes/EscaladoStateful.png)  
 
 
 Además de hacer el escalado secuencial, Kubernetes tampoco permitirá el scale down si alguno de los Pods no es saludable - definido por la readiness probe -. Si lo hiciera, estaríamos parando más de un Pod a la vez - el que no es saludable y otro.  
@@ -40,12 +40,12 @@ Además de hacer el escalado secuencial, Kubernetes tampoco permitirá el scale 
 Como indicamos antes, lo que tendríamos que hacer es generar tantos PVC como Pods tengamos, de forma que cada Pod use su PVC. ¿Como lograr esto?, el StatefulSet utilizara un PVC template, de modo que asigna a cada nodo un PVC, y no solo eso, lo hace en una forma previsible, de modo que si el Pod es scheduleado a otro nodo, seguira teniendo su PVC, y por lo tanto "sus datos".  
 
 
-![TemplatedPVC.png](Imagenes\TemplatedPVC.png)  
+![TemplatedPVC.png](Imagenes/TemplatedPVC.png)  
 
 Los PV asociados no pueden aliminarse cuando un Pod se elimina. Si queremos borrar los datos tendremos que hacerlo manualmente:  
 
 
-![TemplatedPVCDeletio.png](Imagenes\TemplatedPVCDeletio.png)  
+![TemplatedPVCDeletio.png](Imagenes/TemplatedPVCDeletio.png)  
 
 ## Garantias Stateful
 Ademas de los aspectos de identidad - fqdn, e Ip -, y almacenamiento, los StatefulSets tiene otra peculiaridad. Si un Pod no esta saludable, y Kubernetes arranca otro, tendremos dos nodos con el mismo nombre a la vez, __accediendo el mismo almacenamiento__. Esto significa que Kubernetes tiene que añadir garantias de __"como máximo uno"__ en este tipo de recursos.  
@@ -67,15 +67,15 @@ var handler = function(request, response) {
       request.pipe(file);                                          
       console.log("New data has been received and stored.");       
       response.writeHead(200);                                     
-      response.end("Data stored on pod " + os.hostname() + "\n");  
+      response.end("Data stored on pod " + os.hostname() + "/n");  
     });
   } else {
     var data = fileExists(dataFile)                                
       ? fs.readFileSync(dataFile, 'utf8')                          
       : "No data posted yet";                                      
     response.writeHead(200);                                       
-    response.write("You've hit " + os.hostname() + "\n");          
-    response.end("Data stored on this pod: " + data + "\n");       
+    response.write("You've hit " + os.hostname() + "/n");          
+    response.end("Data stored on this pod: " + data + "/n");       
   }
 };
 
@@ -239,7 +239,7 @@ Aqui estamos llamando al pod ``kubia-0``. Cuando hacemos la llamada, la petició
 - El API Server llama al Pod especificado  
 
 
-![StatefulProxies.png](Imagenes\StatefulProxies.png)
+![StatefulProxies.png](Imagenes/StatefulProxies.png)
 ## Borrado de Pods
 Si borramos un Pod:  
 ```
@@ -272,7 +272,7 @@ kubia-1   1/1       Running   0          4m
 Lo que sucedera es que el PV no se elimina cuando el Pod se elimina, y que cuando un nuevo Pod es creado, se crea con la misma identidad del "eliminado", y mapeara el mismo PV, independientemente de cual sea el nodo en el que el Pod haya sido scheduleado:  
 
 
-![StatefulBorrado.png](Imagenes\StatefulBorrado.png)   
+![StatefulBorrado.png](Imagenes/StatefulBorrado.png)   
 
 Si volvieramos a llamar al Pod "recreado", veremos que los datos siguen ahí:  
 ```
@@ -319,8 +319,8 @@ var handler = function(request, response) {
         : "No data posted yet";
       response.end(data);
     } else {
-      response.write("You've hit " + os.hostname() + "\n");
-      response.write("Data stored in the cluster:\n");
+      response.write("You've hit " + os.hostname() + "/n");
+      response.write("Data stored in the cluster:/n");
 
       //Localizamos un peer
       dns.resolveSrv(serviceName, function (err, addresses) {         
@@ -342,7 +342,7 @@ var handler = function(request, response) {
             httpGet(requestOptions, function (returnedData) {         
               numResponses++;
               response.write("- " + item.name + ": " + returnedData);
-              response.write("\n");
+              response.write("/n");
               if (numResponses == addresses.length) {
                 response.end();
               }

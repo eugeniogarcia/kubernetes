@@ -1,4 +1,4 @@
-![Components.png](Imagenes\Components.png)  
+![Components.png](Imagenes/Components.png)  
 
 Status of the components:  
 
@@ -73,7 +73,7 @@ __Note__: ``If you’re using v3 of the etcd API, you can’t use the ls command
 ### Clustering
 For ensuring high availability, you’ll usually run more than a single instance of etcd. Multiple etcd instances will need to remain consistent. Such a distributed system needs to reach a consensus on what the actual state is. etcd uses the ``RAFT`` consensus algorithm to achieve this. Each node’s state is either what the majority of the nodes agrees is the current state or is one of the previously agreed upon states.  
 
-![Raft.png](Imagenes\Raft.png)  
+![Raft.png](Imagenes/Raft.png)  
 
 ## API Server
 The Kubernetes API server is the central component used by all other components and by clients, such as kubectl. Querying and modifying the cluster state over a RESTful API, providing a consistent way of storing objects in etcd. It also handles optimistic locking. One of the API server’s clients is the command-line tool kubectl.  
@@ -82,7 +82,7 @@ API server needs to authenticate the client sending the request. Depending on th
 
 The API server doesn’t do anything else. For example, it doesn’t create pods when you create a ReplicaSet resource and it doesn’t manage the endpoints of a service. That’s what controllers in the Controller Manager do. The API server doesn’t even tell these controllers what to do. All it does is enable those controllers and other components to observe changes to deployed resources. __A Control Plane component can request to be notified when a resource is created, modified, or deleted__. Clients watch for changes by opening an HTTP connection to the API server. Through this connection, the __client will then receive a stream of modifications to the watched objects__.  
 
-![APIServerWatch.png](Imagenes\APIServerWatch.png)  
+![APIServerWatch.png](Imagenes/APIServerWatch.png)  
 
 
 One of the API server’s clients is the ``kubectl tool``, which also supports watching resources. We can continuously monitor the Pod statuses adding the ``--watch`` tag:  
@@ -138,7 +138,7 @@ We are going to use a Deployment resource to understand all the events that will
 
 The controllers, the Scheduler, and the Kubelet are __watching the API server for changes to their respective resource types__.  
 
-![NormalOperation.png](Imagenes\NormalOperation.png)  
+![NormalOperation.png](Imagenes/NormalOperation.png)  
 
 The YAML file containing the Deployment manifest is submitted to Kubernetes through kubectl. kubectl sends the manifest to the Kubernetes API server in an HTTP POST request. The API server validates the Deployment specification, stores it in etcd, and returns a response to kubectl.  
 
@@ -158,13 +158,13 @@ kubectl get events --watch
 ## Infrastructure Container
 When a Pod is created, an infrastructure container is created. The role of this container is to hold all the containers of a pod together, with the same network and Linux namespaces:  
 
-![InfraContainer.png](Imagenes\InfraContainer.png)
+![InfraContainer.png](Imagenes/InfraContainer.png)
 # Inter-Pod Networking
 Each pod gets its own unique IP address and can communicate with all other pods through a flat, NAT-less network. The network is set up by the system administrator or by a Container Network Interface (CNI) plugin, not by Kubernetes itself.  
 
 Kubernetes doesn’t require you to use a specific networking technology, but it does mandate that the pods (or to be more precise, their containers) can communicate with each other, regardless if they’re running on the same worker node or not. The network the pods use to communicate must be such that the IP address a pod sees as its own is the exact same address that all other pods see as the IP address of the pod in question. When pod A connects to (sends a network packet to) pod B, the source IP pod B sees must be the same IP that pod A sees as its own. There should be no network address translation (NAT) performed in between.  
 
-![IPs.png](Imagenes\IPs.png)  
+![IPs.png](Imagenes/IPs.png)  
 
 The requirement for NAT-less communication between pods also extends to pod-to-node and node-to-pod communication. But when a pod communicates with services out on the internet, the source IP of the packets the pod sends does need to be changed, because the pod’s IP is private. The source IP of outbound packets is changed to the host worker node’s IP address. Building a proper Kubernetes cluster involves setting up the networking according to these requirements.  
 
@@ -172,7 +172,7 @@ A pod’s network interface is thus whatever is set up in the infrastructure con
 
 The interface in the __host’s network namespace__ is __attached__ to a network bridge that the __container runtime__ is configured to use. The __eth0 interfac__e in the container is __assigned an IP address from the bridge’s address range__. Anything that an application running inside the container sends to the eth0 network interface (the one in the container’s namespace), comes out at the other veth interface in the host’s namespace and is sent to the bridge. This means it can be received by any network interface that’s connected to the bridge.  
 
-![PodNetworking1.png](Imagenes\PodNetworking1.png)
+![PodNetworking1.png](Imagenes/PodNetworking1.png)
 
 If pod A sends a network packet to pod B, the packet first goes through pod A’s veth pair to the bridge and then through pod B’s veth pair. All containers on a node are connected to the same bridge, which means they can all communicate with each other. But to enable communication between containers running on different nodes, the bridges on those nodes need to be connected somehow.  
 
@@ -183,7 +183,7 @@ Pod IP addresses must be unique across the whole cluster, so the bridges across 
 
 To enable communication between pods across two nodes with plain layer 3 networking, the node’s physical network interface needs to be connected to the bridge as well. Routing tables on node A need to be configured so all packets destined for 10.1.2.0/24 are routed to node B, whereas node B’s routing tables need to be configured so packets sent to 10.1.1.0/24 are routed to node A.  
 
-![PodNetworking2.png](Imagenes\PodNetworking2.png)
+![PodNetworking2.png](Imagenes/PodNetworking2.png)
 
 When a packet is sent by a container on one of the nodes to a container on the other node, the packet first goes through the veth pair, then through the bridge to the node’s physical adapter, then over the wire to the other node’s physical adapter, through the other node’s bridge, and finally through the veth pair of the destination container. This works only when nodes are __connected to the same network switch__, without any routers in between; otherwise those routers would drop the packets because they refer to pod IPs, which are private. Sure, the routers in between could be configured to route packets between the nodes, but this becomes increasingly difficult and error-prone as the number of routers between the nodes increases. Because of this, it’s easier to use a __Software Defined Network (SDN)__, which __makes the nodes appear as though they’re connected to the same network switch__.  
 
@@ -192,13 +192,13 @@ When a service is created in the API server, the virtual IP address is assigned 
 
 Besides watching the API server for changes to Services, kube-proxy also watches for changes to Endpoints objects. The packet’s destination is initially set to the IP and port of the Service (in the example, the Service is at 172.30.0.1:80). Before being sent to the network, the packet is first handled by node A’s kernel according to the iptables rules set up on the node:  
 
-![ServicesRouting.png](Imagenes\ServicesRouting.png)
+![ServicesRouting.png](Imagenes/ServicesRouting.png)
 # High Availability
 For running services without interruption it’s not only the apps that need to be up all the time, but also the Kubernetes Control Plane components.  
 
 When running apps in Kubernetes, the various controllers make sure your app keeps running smoothly and at the specified scale even when nodes fail. To ensure your app is highly available, you only need to run them through a Deployment resource and configure an appropriate number of replicas.  
 
-![HA.png](Imagenes\HA.png)
+![HA.png](Imagenes/HA.png)
 
 etcd was designed as a distributed system, one of its key features is the ability to run multiple etcd instances, so making it highly available is no big deal. All you need to do is run it on an appropriate number of machines (three, five, or seven, as explained earlier in the chapter) and make them aware of each other. etcd will replicate data across all its instances, so a failure of one of the nodes when running a three-machine cluster will still allow the cluster to accept both read and write operations. To increase the fault tolerance to more than a single node, you need to run five or seven etcd nodes, which would allow the cluster to handle two or three node failures, respectively.  
 

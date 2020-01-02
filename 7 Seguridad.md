@@ -37,7 +37,7 @@ default   1         1d
 ```
 The Service Accounts (SA) can be shared by several Pods - in fact the default SA is shared by default by all __the Pods - within a namespace__:
 
-![ServiceAccounts.png](Imagenes\ServiceAccounts.png)
+![ServiceAccounts.png](Imagenes/ServiceAccounts.png)
 
 By assigning different ServiceAccounts to pods, you can control which resources each pod has access to. The server uses the token to authenticate the client sending the request and then determines whether or not the related ServiceAccount is allowed to perform the requested operation. The API server obtains this information from the system-wide authorization plugin configured by the cluster administrator.  
 
@@ -103,11 +103,11 @@ The RBAC authorization rules are configured through four resources, which can be
 - RoleBindings and ClusterRoleBindings, which _bind the above roles to specific users, groups, or ServiceAccounts_.
 
 
-![RBAC.png](Imagenes\RBAC.png)  
+![RBAC.png](Imagenes/RBAC.png)  
 
 The distinction between a Role and a ClusterRole, or between a RoleBinding and a ClusterRoleBinding, is that the Role and RoleBinding are namespaced resources, whereas the ClusterRole and ClusterRoleBinding are cluster-level resources.  
 
-![ClustervsNS.png](Imagenes\ClustervsNS.png)
+![ClustervsNS.png](Imagenes/ClustervsNS.png)
 
 # Demo
 ## Create a NS:  
@@ -260,7 +260,7 @@ Containers in a pod usually run under separate Linux namespaces, which isolate t
 Each pod gets its own IP and port space, because it uses its own network namespace. Each pod has its own process tree, because it has its own PID namespace, it also uses its own IPC namespace, allowing only processes in the same pod to communicate with each other through the Inter-Process Communication mechanism (IPC).  
 Certain pods (usually ___system pods___) __need to operate in the host’s default namespaces__, allowing them to see and manipulate node-level resources and devices. A pod may need to use the node’s network adapters instead of its own virtual network adapters. This can be achieved by setting the __hostNetwork__ property in the pod spec to true:
 
-![NodeNetwork](Imagenes\NodeNetwork.png)
+![NodeNetwork](Imagenes/NodeNetwork.png)
 ```
 apiVersion: v1
 kind: Pod
@@ -283,12 +283,12 @@ Another property in the same space is the HostPort property. This property maps 
 
 We can see these differences in the following diagram. Frist row shows the NodePort property in action; Second row shows the PortService:  
 
-![HostProperty](Imagenes\NodePort.png)
+![HostProperty](Imagenes/NodePort.png)
 
 It’s important to understand that __if a pod is using a specific host port, only one instance of the pod can be scheduled to each node__. The Scheduler takes this into account when scheduling pods, so it doesn’t schedule multiple pods to the same node.  
 For example, suppose we have just three nodes and we want to scale to 4 Pods. One of the Pods will not be schedulled:  
 
-![Schedulling](Imagenes\NodePortSchedulling.png)
+![Schedulling](Imagenes/NodePortSchedulling.png)
 
 Here we can see how the NodePort property is set:  
 
@@ -809,7 +809,7 @@ spec:
 
 Allows pods with the app=webserver label to connect to pods with the app=database label, and only on port 5432.  
 
-![NetworkSecPolicy](Imagenes\NetworkSecPolicy.png)
+![NetworkSecPolicy](Imagenes/NetworkSecPolicy.png)
 
 Client pods usually connect to server pods through a Service instead of directly to the pod, but that doesn’t change anything. __The NetworkPolicy is enforced when connecting through a Service, as well__.  
 ### Isolating the network between Kubernetes namespaces
@@ -836,7 +836,7 @@ spec:
 
 Ensures only pods running in namespaces labeled as tenant: manning can access their Shopping Cart microservice.  
 
-![NamespaceNetPol.png](Imagenes\NamespaceNetPol.png)
+![NamespaceNetPol.png](Imagenes/NamespaceNetPol.png)
 
 __Note__: In a multi-tenant Kubernetes cluster, __tenants usually can’t add labels (or annotations) to their namespaces__ themselves. If they could, they’d be able to circumvent the namespaceSelector-based ingress rules.  
 ### Isolating using CIDR notation

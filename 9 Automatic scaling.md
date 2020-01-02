@@ -11,7 +11,7 @@ The autoscaling process can be split into three steps:
 ## Obtaining pod metrics
 The Autoscaler doesn’t perform the gathering of the pod metrics itself. It gets the metrics from a different source. Node metrics are collected by an agent called __cAdvisor__, which __runs in the Kubelet on each node__, and then __aggregated by the cluster-wide component called Heapster__. The horizontal pod autoscaler controller gets the metrics of all the pods by querying Heapster through REST calls.  
 
-![ScalingHeapster.png](.\Imagenes\ScalingHeapster.png)
+![ScalingHeapster.png](./Imagenes/ScalingHeapster.png)
 
 __Heapster must be running in the cluster for autoscaling to work__.  
 
@@ -20,7 +20,7 @@ The Horizontal Autoescaler needs to find the number that will bring the average 
 
 When autoscaling is based on multiple pod metrics, (for example, both CPU usage and Queries-Per-Second [QPS]), the calculation isn’t that much more complicated. The Autoscaler calculates the replica count for each metric individually and then takes the highest value (for example, if four pods are required to achieve the target CPU usage, and three pods are required to achieve the target QPS, the Autoscaler will scale to four pods).  
 
-![Escaling.png](.\Imagenes\Escaling.png)
+![Escaling.png](./Imagenes/Escaling.png)
 
 The final step of an autoscaling operation is updating the desired replica count field on the scaled resource object. The Autoscaler controller modifies the replicas field of the scaled resource through the Scale sub-resource. It enables the Autoscaler to do its work without knowing any details of the resource it’s scaling. __This allows the Autoscaler to operate on any scalable resource, as long as the API server exposes the Scale sub-resource for it__:  
 - Deployments
@@ -28,7 +28,7 @@ The final step of an autoscaling operation is updating the desired replica count
 - ReplicationControllers
 - StatefulSets  
 
-![AutoescalerE2E.png](.\Imagenes\AutoescalerE2E.png)
+![AutoescalerE2E.png](./Imagenes/AutoescalerE2E.png)
 
 __It takes quite a while for the metrics data to be propagated and a rescaling action to be performed. It isn’t immediate__.  
 

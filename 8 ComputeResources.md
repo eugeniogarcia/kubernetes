@@ -43,7 +43,7 @@ By specifying resource requests, you’re specifying __the minimum amount of res
 
 The Scheduler doesn’t look at how much of each individual resource is being used at the exact time of scheduling but at the sum of resources requested by the existing pods deployed on the node. Three pods are deployed on the node. Together, they’ve requested 80% of the node’s CPU and 60% of the node’s memory. Pod D, shown at the bottom right of the figure, cannot be scheduled onto the node because it requests 25% of the CPU. __The fact that the three pods are currently using only 70% of the CPU makes no difference__.  
 
-![ResSched.png](.\Imagenes\ResSched.png)
+![ResSched.png](./Imagenes/ResSched.png)
 
 The Scheduler first filters the list of nodes to exclude those that the pod can’t fit on and then prioritizes the remaining nodes per the configured prioritization functions. Among others, two prioritization functions rank nodes based on the amount of resources:  
 
@@ -101,7 +101,7 @@ You now have two pods running in your cluster. One has requested 200 millicores 
 
 The CPU requests don’t only affect scheduling—they also determine how the remaining (unused) CPU time is distributed between pods. Because your first pod requested 200 millicores of CPU and the other one 1,000 millicores, any unused CPU will be split among the two pods in a 1 to 5 ratio.  
 
-![ShareCPU.png](.\Imagenes\ShareCPU.png)
+![ShareCPU.png](./Imagenes/ShareCPU.png)
 
 But __if one container wants to use up as much CPU as it can, while the other one is sitting idle__ at a given moment, __the first container will be allowed to use the whole CPU time__ (minus the small amount of time used by the second container, if any). After all, it makes sense to use all the available CPU if no one else is using it, right? __As soon as the second container needs CPU time, it will get it__ and the first container will be throttled back.  
 
@@ -177,7 +177,7 @@ Kubernetes does this by categorizing pods into three Quality of Service (QoS) cl
 - Guaranteed (the highest). This class is given to pods whose containers’ requests are equal to the limits for all resources. Requests and __limits need to be set for both CPU and memory__. They __need to be set for each container__. They __need to be equal__
 
 
-![QoS.png](.\Imagenes\QoS.png)
+![QoS.png](./Imagenes/QoS.png)
 
 When the system is overcommitted, the QoS classes determine which container gets killed first so the freed resources can be given to higher priority pods. First in line to get killed are pods in the BestEffort class, followed by Burstable pods, and finally Guaranteed pods.  
 
@@ -189,7 +189,7 @@ OOM scores are calculated from two things: the percentage of the available memor
 # Setting default requests and limits for pods per namespace
 Instead of having to do this for every container, you can also do it by creating a Limit-Range resource. It allows you to specify (for each namespace) not only the minimum and maximum limit you can set on a container for each resource, but also the default resource requests for containers that don’t specify requests explicitly.  
 
-![LimitRange.png](.\Imagenes\LimitRange.png)
+![LimitRange.png](./Imagenes/LimitRange.png)
 
 LimitRange resources are used by the __LimitRanger Admission Control plugin__. When a pod manifest is posted to the API server, the LimitRanger plugin validates the pod spec. If validation fails, the manifest is rejected immediately.  
 
@@ -325,7 +325,7 @@ The Kubelet itself already contains an agent called cAdvisor, which performs the
 
 Heapster runs as a pod on one of the nodes and is exposed through a regular Kubernetes Service, making it accessible at a stable IP address. Collects the data from all cAdvisors in the cluster and exposes it in a single location. 
 
-![Heapster.png](.\Imagenes\Heapster.png)
+![Heapster.png](./Imagenes/Heapster.png)
 
 The pods (or the containers running therein) don’t know anything about cAdvisor, and cAdvisor doesn’t know anything about Heapster. It’s Heapster that connects to all the cAdvisors, and it’s the cAdvisors that collect the container and node usage data without having to talk to the processes running inside the pods’ containers.  
 
@@ -348,5 +348,5 @@ When using Minikube, Grafana’s web console is exposed through a NodePort Servi
 minikube service monitoring-grafana -n kube-system
 ```
 
-![Grafana.png](.\Imagenes\Grafana.png)
+![Grafana.png](./Imagenes/Grafana.png)
 

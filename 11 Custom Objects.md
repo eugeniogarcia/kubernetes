@@ -6,7 +6,7 @@ Creating a CRD so that users can create objects of the new type isn’t a useful
 ## Example
 You want to allow users of your Kubernetes cluster to run static websites as easily as possible. For users to create objects of type Website that contain nothing more than the website’s name and the source from which the website’s files (HTML, CSS, PNG, and others) should be obtained.  
 
-![CustomResource.png](.\Imagenes\CustomResource.png)
+![CustomResource.png](./Imagenes/CustomResource.png)
 
 ```
 kind: Website                                                   1
@@ -82,7 +82,7 @@ website "kubia" deleted
 
 There is a missing ingredient, the __Controller__. To make your Website objects run a web server pod exposed through a Service, you’ll need to build and deploy a Website controller. In our example the Controller will make sure the Pod is managed and survives node failures by creating a Deployment resource.  
 
-![ControllerExample.png](.\Imagenes\ControllerExample.png)
+![ControllerExample.png](./Imagenes/ControllerExample.png)
 
 I’ve written a simple initial version of the controller, which works well enough to show CRDs and the controller in action, but it’s far from being production-ready, because it’s overly simplified. The container image is available at docker.io/luksa/ website-controller:latest, and the source code is at https://github.com/luksa/k8s-website-controller (the repo has been cloned).  
 
@@ -124,7 +124,7 @@ func deleteWebsite(website v1.Website) {
 
 We refer to two resources, a `service` and a `deployment`, defined in two templates (you can see the json`s for the two resources).  
 
-![Controller.png](.\Imagenes\Controller.png)
+![Controller.png](./Imagenes/Controller.png)
 
 The Deployment resource contains a template for a pod with two containers. The local directory is shared with the nginx container through an emptyDir volume. The Service is a NodePort Service, which exposes your web server pod through a random port on each node. When a pod is created by the Deployment object, clients can access the website through the node port.  
 
@@ -208,7 +208,7 @@ It isn’t ideal. You’d want the API server to validate the object and reject 
 ## Providing a custom API server for your custom objects
 A better way of adding support for custom objects in Kubernetes is to implement your own API server and have the clients talk directly to it. You can integrate your custom API server with the main Kubernetes API server, through API server aggregation. Clients can connect to the aggregated API and have their requests transparently forwarded to the appropriate API server. The client wouldn’t even be aware that multiple API servers handle different objects behind the scenes.  
 
-![CustomServer.png](.\Imagenes\CustomServer.png)
+![CustomServer.png](./Imagenes/CustomServer.png)
 
 You’d no longer need to create a CRD to represent those objects, because you’d implement the Website object type into the custom API server directly. Generally, each API server is responsible for storing their own resources.  
 
@@ -247,7 +247,7 @@ The Service Catalog is a catalog of services. Users can browse through the catal
 - A ServiceInstance, which is one instance of a service that has been provisioned
 - A ServiceBinding, which represents a binding between a set of clients (pods) and a ServiceInstance
 
-![ServiceCatalogue.png](.\Imagenes\ServiceCatalogue.png)  
+![ServiceCatalogue.png](./Imagenes/ServiceCatalogue.png)  
 
 In a nutshell, a cluster admin creates a ClusterServiceBroker resource for each service broker whose services they’d like to make available in the cluster.  
 
