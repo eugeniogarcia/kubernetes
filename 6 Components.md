@@ -15,7 +15,7 @@ __Kubernetes system components communicate only with the API server. They don’
 
 __Connections between the API server and the other components are almost always initiated by the components__, as shown in figure. But the API server does connect to the Kubelet when you use kubectl to fetch logs, use kubectl attach to connect to a running container, or use the kubectl port-forward command.  
 
-__The components on the worker nodes__ all need to __run on the same node__, the components of the Control Plane can easily be split across multiple servers__.  
+__The components on the worker nodes__ all need to __run on the same node__, the components of the Control Plane can easily be __split across multiple servers__.  
 
 While __multiple instances of etcd and API server__ can be active at the same time and do perform their jobs in parallel, __only a single instance of the Scheduler and the Controller Manager__ may be active at a given time.  
 
