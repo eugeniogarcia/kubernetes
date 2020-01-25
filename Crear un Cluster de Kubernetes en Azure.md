@@ -154,7 +154,7 @@ Then we exit from the console. In Powershell we issue the following commands:
 
 - Deallocate the VM:
 
-``´sh
+```sh
 az vm deallocate --resource-group KubernetesTestCluster --name base-vm
 ```
 
@@ -208,24 +208,191 @@ az resource list --tag name=base-vm
 
 ## Initializing your control-plane node
 
+To create a new virtual machine for your control-plane node using the prepared base-vm-image
+
+```sh
+
+az vm create \
+   --resource-group KubernetesTestCluster \
+   --name master1 \
+   --image base-vm-image \
+   --size Standard_B2s \
+   --admin-username azuser \
+   --ssh-key-value ~/.ssh/id_rsa.pub
+```
+
+We use ssh to connect to the VM:
+
+```sh
+sudo su -
+```
+
+We configure bash completion:
+
+```sh
+mkdir -p $HOME/.kube
+```
+
+```sh
+kubectl completion bash > ~/.kube/completion.bash.inc
+```
+
+```sh
+printf "
+# Kubectl shell completion
+source '$HOME/.kube/completion.bash.inc'
+" >> $HOME/.bash_profile
+```
+
+```sh
+source $HOME/.bash_profile
+```
+
+## Initialize the control plane:
+
+```sh
+kubeadm init --pod-network-cidr=10.244.0.0/16
+```
+
+We should see something like this:
+
+```sh
+[init] Using Kubernetes version: v1.17.0
+[preflight] Running pre-flight checks
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+...
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join <control-plane-host>:<control-plane-port> --token <token> \
+    --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+Where `token` is the actual token that has to be used. For example, in my case i got the following:
+
+```sh
+kubeadm join 10.0.0.4:6443 --token 1u9kyl.zln914vwtyzgu0yz \
+    --discovery-token-ca-cert-hash sha256:019c47ef56b4f79828a6c81af25a54b512336cb0f26df400a9ffd6f05af3c85f
+```
+
+Then we have to configure kubectl and run kubectl cluster-info to verify that Kubernetes master is running:
+
+```sh
+mkdir -p $HOME/.kube
+```
+
+```sh
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+```
+
+```sh
+sudo chown $(id -u):$(id -g) $HOME/admin.conf
+```
+
+```sh
+export KUBECONFIG=$HOME/admin.conf
+```
+
+```sh
+kubectl cluster-info
+
+Kubernetes master is running at https://10.0.0.4:6443
+KubeDNS is running at https://10.0.0.4:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+```
+
+Install pod network addon:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+```
+
+## Adding a worker node to the cluster
+
+Create a new virtual machine for a worker node using the prepared base-vm-image
+
+```sh
+az vm create \
+   --resource-group KubernetesTestCluster \
+   --name worker1 \
+   --image base-vm-image \
+   --size Standard_B2s \
+   --admin-username azuser \
+   --ssh-key-value ~/.ssh/id_rsa.pub
+```
+
+Connect via ssh:
+
+```sh
+ssh azuser@<publicIpAddress>
+```
+
+Run the kubeadm join command that you saw in the output of kubeadm init above
+
+```sh
+sudo kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+In my case, the command that was run was:
+
+```sh
+sudo su -
+
+kubeadm join 10.0.0.4:6443 --token 1u9kyl.zln914vwtyzgu0yz --discovery-token-ca-cert-hash sha256:019c47ef56b4f79828a6c81af25a54b512336cb0f26df400a9ffd6f05af3c85f
+```
+
+By default, __tokens expire after 24 hours__. If you are joining a node to the cluster after the current token has expired, you can create a new token by running kubeadm token create on the master node.
+
+## Smoke testing
+
+To verify that all nodes are Ready and all pods are Running, connect to the __master__ using ssh, run as `su`:
+
+```sh
+sudo su -
+```
+
+Check the nodes:
+
+```sh
+kubectl get nodes -o wide
 
 
+NAME      STATUS   ROLES    AGE     VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME
+master1   Ready    master   27m     v1.17.2   10.0.0.4      <none>        Ubuntu 18.04.3 LTS   5.0.0-1028-azure   containerd://1.2.10
+worker1   Ready    <none>   5m54s   v1.17.2   10.0.0.5      <none>        Ubuntu 18.04.3 LTS   5.0.0-1028-azure   containerd://1.2.10
+```
+
+Lets see the pods:
+
+```sh
+kubectl get pods --all-namespaces -o wide
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE     IP           NODE      NOMINATED NODE   READINESS GATES
+kube-system   coredns-6955765f44-5pmgw          1/1     Running   0          24m     10.244.0.4   master1   <none>           <none>
+kube-system   coredns-6955765f44-lc2qp          1/1     Running   0          24m     10.244.0.3   master1   <none>           <none>
+kube-system   etcd-master1                      1/1     Running   0          24m     10.0.0.4     master1   <none>           <none>
+kube-system   kube-apiserver-master1            1/1     Running   0          24m     10.0.0.4     master1   <none>           <none>
+kube-system   kube-controller-manager-master1   1/1     Running   0          24m     10.0.0.4     master1   <none>           <none>
+kube-system   kube-flannel-ds-amd64-qpbbl       1/1     Running   0          3m16s   10.0.0.5     worker1   <none>           <none>
+kube-system   kube-flannel-ds-amd64-xcmdq       1/1     Running   0          18m     10.0.0.4     master1   <none>           <none>
+kube-system   kube-proxy-dffbs                  1/1     Running   0          3m16s   10.0.0.5     worker1   <none>           <none>
+kube-system   kube-proxy-zpm2n                  1/1     Running   0          24m     10.0.0.4     master1   <none>           <none>
+kube-system   kube-scheduler-master1            1/1     Running   0          24m     10.0.0.4     master1   <none>           <none>
+```
 
 # Procedures
 
@@ -392,3 +559,17 @@ Delete an image
 ```
 az image delete --name myOldImage --resource-group myResourceGroup
 ```
+
+## Connect to a VM using an SSH Agent
+
+In my setup i have created the following:
+
+- Master node - following this guide
+- Two Worker nodes - following this guide
+
+I have attached a public ip to the master node and to one of the workers. To connect to the worker that does not have a public ip i have used ssh-agent. In the case of windows the procedure is:
+
+- start `pageant.exe`
+- add the private key we want to forward to `pageant.exe`
+- start `putty`. In the Authentication - `Connection->SSH->Auth` - enable the check `Allow agent forwarding`
+- connect via putty to the worker node that has a public ip. Once there, do ssh to the other worker node
