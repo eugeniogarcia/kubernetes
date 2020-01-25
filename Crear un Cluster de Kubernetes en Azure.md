@@ -573,3 +573,69 @@ I have attached a public ip to the master node and to one of the workers. To con
 - add the private key we want to forward to `pageant.exe`
 - start `putty`. In the Authentication - `Connection->SSH->Auth` - enable the check `Allow agent forwarding`
 - connect via putty to the worker node that has a public ip. Once there, do ssh to the other worker node
+
+## Run from local machine
+
+In the master node, in folder `/etc/kubernetes`, take a copy of the `admin.conf` file to your local machine.
+
+In `/etc/kubernetes/pik` we have all the certificates used by kubernetes. Open the `apiserver.crt`. In the Subject Alternative names take a look at the different DNS entries configured. Will pick one, in our case we chose `kubernetes.default.svc.cluster.local`.
+
+Update the `admin.conf` file, specifically
+
+```yaml
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJd01ERXlOVEV6TkRjd01sb1hEVE13TURFeU1qRXpORGN3TWxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBSzNxCnBpKzhFTVRUTmhKSnZyUk5IcXMrN3JWdGNMS0tRUVIxeFI1UW1BMW8rYXFaaExjQjZ5ZWxUdEVMK093eFlCajYKMWtGV0NJaGhQUlZPV3dBTTJmUUtjTThmTGhQRmRoRVJCSkJOQjZxakFQRHg0amFIeTNSU093YUhnNmhWNDQxbQpWZ0RCU2hjOS8wZDBrZCsvNEFHMDllbXBDYjhnRVVvcXVDQnBxMVdsVnJqNUdld09JWDR1YkU0KzNNdDBQVVIwCjJZRkpkenpUZlVEQUhPYmFWZ25nb3Nnb1RsS3BvakNkYXQ5cDR3SFh4OWNoU1o1dTl5b2l1ZWQwUU96Vkk5TWYKS1VwUWRuem53QUxjaldhdjg2ZDRjN2ZrK0RKZmx4d0N4TWtXWkFuQk4zcGZaUHBpQjdmelhGZDlQTjcxQlJBWQpldm01amRNeWtLbVVnaXNRWWNrQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFJNU0yUEFvWDRtQ1RjNmsvWVNZOUJiaWRnODgKa3huZmkrdC9jOTNGT2cwd0UrNmFsYUc4MzRqZHNTR1A1Um90ZXhEbC9DUFlzTUlJWHFqa1A3UzAvTUZ0N056QgpTY1U2NUkxTk5qNXhUR3o0aytCa1hZRFoyZGRiZnZPdVkrQlBndXJNcE1zNTJNWCtsb3FzWitrVU1jdG9VMlB1CnFURVpSQ1lOQ3Ezd05mbUU3eEtieHJqK21XSlFOL1Y4THZKK0M2MnFENWZTY3Q1RUg3Ry9McmV1cEFJbDg0TngKVTFqWUFwRCtvRFZSK1RmTi9mQ3BBdFBXcWpIRTdwaHFIT05TYkZzTllvZ3RUUEhvRnhwbEdXR0FVU1BCajJsegpxeHFMeEZDdXNCSkhVTEdrOE11N2JMbVBteFZnR1pXQXZFQlFPMFBBa3djODlIYkNSNlpQN2lOa2JUTT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://10.0.0.4:6443
+  name: kubernetes
+contexts:
+
+...
+```
+
+Is changed so the server address uses the DNS entry we picked from the certificate:
+
+```yaml
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJd01ERXlOVEV6TkRjd01sb1hEVE13TURFeU1qRXpORGN3TWxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBSzNxCnBpKzhFTVRUTmhKSnZyUk5IcXMrN3JWdGNMS0tRUVIxeFI1UW1BMW8rYXFaaExjQjZ5ZWxUdEVMK093eFlCajYKMWtGV0NJaGhQUlZPV3dBTTJmUUtjTThmTGhQRmRoRVJCSkJOQjZxakFQRHg0amFIeTNSU093YUhnNmhWNDQxbQpWZ0RCU2hjOS8wZDBrZCsvNEFHMDllbXBDYjhnRVVvcXVDQnBxMVdsVnJqNUdld09JWDR1YkU0KzNNdDBQVVIwCjJZRkpkenpUZlVEQUhPYmFWZ25nb3Nnb1RsS3BvakNkYXQ5cDR3SFh4OWNoU1o1dTl5b2l1ZWQwUU96Vkk5TWYKS1VwUWRuem53QUxjaldhdjg2ZDRjN2ZrK0RKZmx4d0N4TWtXWkFuQk4zcGZaUHBpQjdmelhGZDlQTjcxQlJBWQpldm01amRNeWtLbVVnaXNRWWNrQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFJNU0yUEFvWDRtQ1RjNmsvWVNZOUJiaWRnODgKa3huZmkrdC9jOTNGT2cwd0UrNmFsYUc4MzRqZHNTR1A1Um90ZXhEbC9DUFlzTUlJWHFqa1A3UzAvTUZ0N056QgpTY1U2NUkxTk5qNXhUR3o0aytCa1hZRFoyZGRiZnZPdVkrQlBndXJNcE1zNTJNWCtsb3FzWitrVU1jdG9VMlB1CnFURVpSQ1lOQ3Ezd05mbUU3eEtieHJqK21XSlFOL1Y4THZKK0M2MnFENWZTY3Q1RUg3Ry9McmV1cEFJbDg0TngKVTFqWUFwRCtvRFZSK1RmTi9mQ3BBdFBXcWpIRTdwaHFIT05TYkZzTllvZ3RUUEhvRnhwbEdXR0FVU1BCajJsegpxeHFMeEZDdXNCSkhVTEdrOE11N2JMbVBteFZnR1pXQXZFQlFPMFBBa3djODlIYkNSNlpQN2lOa2JUTT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://kubernetes.default.svc.cluster.local:6443
+  name: kubernetes
+contexts:
+
+...
+```
+
+Update the `hosts` file so that the DNS is solved into the public ip:
+
+```yaml
+# For Azure control plane
+51.136.77.7	kubernetes.default.svc.cluster.local
+```
+
+In our case `51.136.77.7` was the public ip assigned by Azure.
+
+In Azure we created a __NAT__ rule in our Load Balancer, so that `6443` is mapped to our master node. In the NSG of our master node we also have to open this port.
+
+With that:
+
+```sh
+PS [EUGENIO] >kubectl --kubeconfig .\admin.conf get po --all-namespaces
+
+
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE
+kube-system   coredns-6955765f44-5pmgw          1/1     Running   1          6h26m
+kube-system   coredns-6955765f44-lc2qp          1/1     Running   1          6h26m
+kube-system   etcd-master1                      1/1     Running   1          6h26m
+kube-system   kube-apiserver-master1            1/1     Running   1          6h26m
+kube-system   kube-controller-manager-master1   1/1     Running   1          6h26m
+kube-system   kube-flannel-ds-amd64-4gzzn       1/1     Running   2          5h16m
+kube-system   kube-flannel-ds-amd64-qpbbl       1/1     Running   1          6h5m
+kube-system   kube-flannel-ds-amd64-xcmdq       1/1     Running   1          6h20m
+kube-system   kube-proxy-dffbs                  1/1     Running   1          6h5m
+kube-system   kube-proxy-tqg9q                  1/1     Running   1          5h16m
+kube-system   kube-proxy-zpm2n                  1/1     Running   1          6h26m
+kube-system   kube-scheduler-master1            1/1     Running   1          6h26m
+```
