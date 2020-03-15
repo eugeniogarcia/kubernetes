@@ -1,4 +1,12 @@
-Install bookinfo:
+## Install Istio
+
+Descargar la última version de Istio. Con `istioctl` instalado, ejecutar:
+
+```
+istioctl manifest apply --set profile=demo
+```
+
+## Install bookinfo
 
 ```sh
 kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
