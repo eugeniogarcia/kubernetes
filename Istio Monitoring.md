@@ -9,6 +9,12 @@ istioctl manifest apply --set profile=demo
 ## Install bookinfo
 
 ```sh
+kubectl label namespace default istio-injection=enabled
+```
+
+Nos aseguramos de que el namespace default inyecte los sidecars de istio automáticamente:
+
+```sh
 kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
 
 kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
