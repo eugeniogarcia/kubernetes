@@ -92,7 +92,13 @@ kubectl -n istio-system get svc prometheus
 kubectl -n istio-system get svc grafana
 ```
 
-Lets generate some load:
+Lets generate some load. Lets see what is the ingress ip:
+
+```sh
+kubectl get svc istio-ingressgateway -n istio-system
+```
+
+Now we can generate the load:
 
 ```sh
 watch -n 1 curl -o /dev/null -s -w %{http_code} http://40.66.58.159/productpage
