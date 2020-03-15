@@ -6,13 +6,57 @@ Descargar la última version de Istio. Con `istioctl` instalado, ejecutar:
 istioctl manifest apply --set profile=demo
 ```
 
-## Install bookinfo
+Nos aseguramos de que el namespace default inyecte los sidecars de istio automáticamente:
 
 ```sh
 kubectl label namespace default istio-injection=enabled
 ```
 
-Nos aseguramos de que el namespace default inyecte los sidecars de istio automáticamente:
+__NOTA__: He modificado el `deployment` `ìstiod` para que los recursos que precisa de memoria sean más pequeños, y así poder usar el nodo más pequeño disponible en Azure. Estaba en 2GB:
+
+```yaml
+{
+  "kind": "Deployment",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "istiod",
+    "namespace": "istio-system",
+
+...
+
+            "resources": {
+              "requests": {
+                "cpu": "500m",
+                "memory": "2GB"
+              }
+            },
+
+...
+```
+
+Y lo he dejado en 500 MB:
+
+```yaml
+{
+  "kind": "Deployment",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "istiod",
+    "namespace": "istio-system",
+
+...
+
+            "resources": {
+              "requests": {
+                "cpu": "500m",
+                "memory": "500Mi"
+              }
+            },
+
+...
+```
+
+## Install bookinfo
 
 ```sh
 kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
