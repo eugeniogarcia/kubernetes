@@ -66,6 +66,8 @@ kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
 kubectl apply -f samples/bookinfo/networking/destination-rule-all.yaml
 ```
 
+## Setup Monitoring
+
 We enable distributed trazing with `Zipkin`, kpi monitoring with `Grafana` & `Prometheus`, and the graphing of the istion mesh with `Kiali`:
 
 ```sh
@@ -123,3 +125,49 @@ And finally to watch Kiali (user and password are `admin`, `admin`):
 ```sh
 istioctl dashboard kiali
 ```
+
+### Kiali usuer
+
+Por alguna razón, en la última versión de Istio el usuario password de Kiali no estaba seteado a `admin`, `admin`. Para especificar el usuario estos son los pasos que hay que seguir:
+
+1. Creamos el secret:
+
+```ps
+kubectl create secret generic kiali -n istio-system --from-literal=username=admin --from-literal=passphrase=admin
+```
+
+2. Borramos el pod de Kiali
+
+```ps
+kubectl get po -n istio-system                                                                                           
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+grafana-75745787f9-kq97v                1/1     Running   0          13m
+istio-ingressgateway-5498c5f958-bdw4t   1/1     Running   0          46m
+istio-tracing-9dc46fd77-dd6zk           1/1     Running   0          13m
+istiod-64dfc948fb-hpvf6                 1/1     Running   0          26m
+kiali-85dc7cdc48-bdhpx                  1/1     Running   0          18m
+prometheus-9d69dd564-x2jpk              2/2     Running   0          71m
+```
+
+```ps
+kubectl delete po kiali-85dc7cdc48-bdhpx -n istio-system                                                                 pod "kiali-85dc7cdc48-bdhpx" 
+
+deleted
+```
+
+El pod se recreara automáticamente:
+
+```ps
+kubectl get po -n istio-system                                                                                           
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+grafana-75745787f9-kq97v                1/1     Running   0          14m
+istio-ingressgateway-5498c5f958-bdw4t   1/1     Running   0          47m
+istio-tracing-9dc46fd77-dd6zk           1/1     Running   0          14m
+istiod-64dfc948fb-hpvf6                 1/1     Running   0          26m
+kiali-85dc7cdc48-d9sk8                  0/1     Running   0          14s
+prometheus-9d69dd564-x2jpk              2/2     Running   0          72m
+```
+
+Y ya podemos entrar.
