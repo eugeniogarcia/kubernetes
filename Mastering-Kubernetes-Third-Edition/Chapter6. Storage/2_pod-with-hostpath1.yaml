@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: the-pod-withhost1
+spec:
+  containers:
+  - name: the-container
+    image: g1g1/py-kube:0.2
+    command: ["bash"]
+    args: ["-c", "echo started...; while true ; do sleep 1 ; done"]
+    volumeMounts:
+    - mountPath: "/mnt/data"
+      name: mialmacenamiento
+  volumes:
+  - name: mialmacenamiento
+    hostPath:
+      path: /etc/hue/data/coupons
