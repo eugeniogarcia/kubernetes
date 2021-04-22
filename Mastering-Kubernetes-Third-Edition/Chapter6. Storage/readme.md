@@ -56,7 +56,7 @@ Con este tipo de volumenes garantizamos persistencia incluso cuando un nodo muer
 En este tipo de volumenes hay que especificar una clase de almacenamiento. El papel de la clase de almacenamiento es el de provisionar el disco - en azure se ofrecen dos clases de almacenamiento dinámico que automatizan la creación de un recurso de disco, y lo montan.
 
 Hay dos partes para crear el volumen:
-- Persistent Volume (PV). Se indican todos los datos (tipo, capavidad, modo de acceso, ...)
+- Persistent Volume (PV). Se indican todos los datos (tipo, capacidad, modo de acceso, ...)
   - Estático. Se crea manualmente por un administrador en el nodo. Se especifica el punto de montaje
   - Dinámico. La clase de almancenamiento automatiza el proceso
 - Persistent Volume Claim (PVC). El desarrollador crea este recurso con las características que se necesitan para el nodo. En el nodo se indica el Persistent Volume Claim

@@ -4,7 +4,9 @@ Vemos la definición base:
 
 ```ps
 kubectl kustomize base
+```
 
+```ps
 apiVersion: v1
 kind: Pod
 metadata:
@@ -93,7 +95,9 @@ Vemos el recurso:
 
 ```ps
 kubectl kustomize .\overlays\staging\
+```
 
+```ps
 apiVersion: v1
 kind: Namespace
 metadata:
