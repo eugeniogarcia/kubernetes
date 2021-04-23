@@ -32,12 +32,32 @@ PWD=/
 # 2. Stateful Set
 
 Necesitamos varias cosas:
-- Un headless service. CoreDNS asignará a cada pod asociado al servicio un _A record_ en la zona. También se definirá un servicio en la zona. Cuando un pod quiera referirse al servicio, se consultará al DNS para la resolución. CoreDNS tiene que monitorizar en el API Server cualquier cambio en los end-points para mantener la configuración de la zona actualizada
+- Un headless service. Proporcionará la identidad de los pods
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+    - port: 80
+      name: web
+  clusterIP: None
+  selector:
+    app: nginx
+```
+
+Creamos el servicio:
 
 ```ps
 kubectl apply -f .\2_nginx-headless-service.yaml
 service/nginx created
 ```
+
+Vemos como efectivamente no tiene una ip asignada, es _headless_:
 
 ```ps
 kubectl get svc
@@ -47,10 +67,23 @@ kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   14h
 nginx        ClusterIP   None         <none>        80/TCP    11s
 ```
 
-Creamos el stateful set:
+- El Statefull set, que define el número de replicas a utilizar. Creamos el stateful set:
 
 ```ps
 kubectl apply -f .\2_nginx-stateful-set.yaml
+```
+
+- Almacenamiento persistente (parte de la definición del pod):
+
+```yaml
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Mi
 ```
 
 Podemos ver que el PV se ha creado dinámicamente. También podemos ver que se han creado los PVC y que se han asociado al PV. 
@@ -78,11 +111,17 @@ El PV se creo dinámicamente porque el _addmission controller_ tiene el plugin _
 ['kube-apiserver', '--advertise-address=172.17.53.204', '--allow-privileged=true', '--authorization-mode=Node,RBAC', '--client-ca-file=/var/lib/minikube/certs/ca.crt', '--enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota', ...]
 ```
 
-Veamos que configuración tenemos en el dns:
+## 2.1 CoreDNS y los servicios headless
+
+CoreDNS asignará a cada pod asociado al servicio un _A record_ en la zona. También se definirá un servicio en la zona. Cuando un pod quiera referirse al servicio, se consultará al DNS para la resolución. CoreDNS tiene que monitorizar en el API Server cualquier cambio en los end-points para mantener la configuración de la zona actualizada.
+
+Para analizar qué es lo que hace CoreDNS vamos a necesitar usar las utilidades dns. Las tenemos configuradas en la siguiente imagen que definimos en este pod:
 
 ```ps
 kubectl apply -f .\2_dns_debug.yaml
 ```
+
+Nos conectamos a la image para usar las herramientas. Lo primero es ver que nuestro CoreDNS resuelve el nombre del cluster:
 
 ```ps
 kubectl exec -i -t dnsutils -- nslookup kubernetes.default
@@ -94,6 +133,8 @@ Name:   kubernetes.default.svc.cluster.local
 Address: 10.96.0.1
 ```
 
+Podemos ver que todos los pods que se crean, incluido el que estamos usando con las herramientas DNS, se configuran apuntando al DNS del cluster, a nuestro CoreDNS:
+
 ```ps
 kubectl exec -ti dnsutils -- cat /etc/resolv.conf
 
@@ -101,6 +142,8 @@ nameserver 10.96.0.10
 search default.svc.cluster.local svc.cluster.local cluster.local
 options ndots:5
 ```
+
+POdemos ver que cuando el pod que implementa CoreDNS arrancó, el arranque fue correcto:
 
 ```ps
 kubectl logs --namespace=kube-system -l k8s-app=kube-dns
@@ -111,6 +154,8 @@ CoreDNS-1.7.0
 linux/amd64, go1.14.4, f59c03d
 ```
 
+Podemos ver que se instancia un servicio en el cluster que expone el end-point de CoreDNS. Notese como se abre el puerto 53 en udp y tcp:
+
 ```ps
 kubectl get svc --namespace=kube-system
 
@@ -118,7 +163,7 @@ NAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
 kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   15h
 ```
 
-Podemos ver las tres entradas que se han creado para el headless service:
+Una vez hemos comprobado que CoreDNS se ha configurado correctamente en el cluster, podemos ver como se resuelve nuestro headless service:
 
 ```ps
 kubectl exec -i -t dnsutils -- dig nginx.default.svc.cluster.local
@@ -149,12 +194,4 @@ nginx.default.svc.cluster.local. 30 IN  A       172.18.0.3
 ;; MSG SIZE  rcvd: 213
 ```
 
-```ps
-kubectl exec -i -t dnsutils -- nslookup kubernetes.default.svc.cluster.local
-
-Server:         10.96.0.10
-Address:        10.96.0.10#53
-
-Name:   kubernetes.default.svc.cluster.local
-Address: 10.96.0.1
-```
+Observamos que no hay un A record para el headless service, porque no hay una vip asociada a él. En su lugar el plugin de CoreDNS inspecciona el ip-range del servicio y crea una entrada, un A record para cada IP, y les asocia el nombre del servicio. Creara también un servicio http y udp. Esto significa que con el headless service, __CoreDNS tiene que subscribise con el API Server para enterarse de cualquier cambio en el ip-range del servicio, y reacciones quitando o añadiendo entradas en la zona__.
