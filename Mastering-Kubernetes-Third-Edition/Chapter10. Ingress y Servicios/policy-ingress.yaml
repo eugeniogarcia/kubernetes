@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: entrada-a-nginx
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance : mi-ingress
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: entrada-a-manager
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: manager
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/instance : mi-ingress
+    ports:
+    - port: 9090
+      protocol: TCP
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: entrada-a-db
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: postgres
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          role: manager
+    ports:
+    - port: 5432
+      protocol: TCP

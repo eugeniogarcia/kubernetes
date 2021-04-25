@@ -5,17 +5,20 @@ metadata:
   labels:
     svc: social-graph
     app: manager
+    role: manager
 spec:
   replicas: 1
   selector:
     matchLabels:
       svc: social-graph
       app: manager
+      role: manager
   template:
     metadata:
       labels:
         svc: social-graph
         app: manager
+        role: manager
     spec:
       containers:
       - name: social-graph-manager
@@ -40,3 +43,4 @@ spec:
   selector:
     svc: social-graph
     app: manager
+    role: manager

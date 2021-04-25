@@ -185,3 +185,232 @@ curl --location --request POST 'http://www.fgz.com/test/unfollow' \
 {"err":""}
 ```
 
+# Network Policy
+
+Lo primero es instalar un plugin CNI que implemente [Network Policies](https://v1-18.docs.kubernetes.io/docs/concepts/services-networking/network-policies/). En nuestro caso, con Azure, usaremos Calico. Es __importante destacar, que solo podemos habilitar Calico al crear el Cluster, no se podrá habilitar con un Cluster ya creado__.
+
+Comprobamos que antes de aplicar ninguna policy tenemos:
+
+```ps
+curl "http://www.fgz.com/test/followers/egsmartin"
+```
+
+Obtenemos una respuesta:
+
+```ps
+StatusCode        : 200
+StatusDescription : OK
+Content           : {"followers":{},"err":""}
+
+RawContent        : HTTP/1.1 200 OK
+                    Connection: keep-alive
+                    Content-Length: 26
+                    Content-Type: text/plain; charset=utf-8
+                    Date: Sun, 25 Apr 2021 11:36:36 GMT
+
+                    {"followers":{},"err":""}
+
+Forms             : {}
+Headers           : {[Connection, keep-alive], [Content-Length, 26], [Content-Type, text/plain; charset=utf-8], [Date, Sun, 25 Apr
+                    2021 11:36:36 GMT]}
+Images            : {}
+InputFields       : {}
+Links             : {}
+ParsedHtml        : mshtml.HTMLDocumentClass
+RawContentLength  : 26
+```
+
+## Deny all
+
+Vamos a aplicar una politica sobre el namespace _default_ que deniegue las comunicaciones entre los pods. De esta forma por defecto no admitimos ningún trafico de entrada o de salida en pods: 
+
+```yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: test-deny
+  namespace: default
+spec:
+  podSelector:
+    matchLabels: {}
+  policyTypes:
+  - Ingress
+  - Egress
+```
+
+Indicamos que cualquier pod `matchLabels: {}` no admite ni Ingress ni Egress - puesto que no espcificamos ningun origen ni destino en `Ingress` ni `Egress` respectivamente.
+
+Aplicamos la policy:
+
+```ps
+kubectl apply -f .\deny-policy.yaml
+
+networkpolicy.networking.k8s.io/test-deny created
+```
+
+Verificamos que ya no tenemos acceso:
+
+```ps
+curl "http://www.fgz.com/test/followers/egsmartin"
+```
+
+Obtenemos un error:
+
+```ps
+curl : Unable to connect to the remote server
+At line:1 char:1
++ curl "http://www.fgz.com/test/followers/egsmartin"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+```
+
+## Ingress y Egress
+
+Vamos a habilitar una politica que permite el ingress desde el _ingress nginx_, pasando por el _manager_ y terminando en el _db_. El egress se tiene que permitir desde el _ingress nginx_ hacía el _manager_. El _db_ no tiene que hacer ninguna llamada
+
+```txt
+  ->  ingress nginx  ->  manager  ->  db
+  
+ a) ingress nginx. Requiere ingress y egress. Lo vamos a permitir a cualquier puerto y protocolo
+ b) manager. Requiere ingress y egress. El ingress solo es el puerto 9090, y el egress al 5432
+ c) db. Solo require ingress por el 5432
+```
+
+### Ingress
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: entrada-a-nginx
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance : mi-ingress
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: entrada-a-manager
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: manager
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/instance : mi-ingress
+    ports:
+    - port: 9090
+      protocol: TCP
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: entrada-a-db
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: postgres
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          role: manager
+    ports:
+    - port: 5432
+      protocol: TCP
+```
+
+- A los pods `app.kubernetes.io/instance : mi-ingress` se les permite cualquier Ingress `{}`
+- A los pods `role: manager` se les permite el Ingress via `TCP` al puerto `9090`
+- A los pods `role: postgres` se les permite el Ingress via `TCP` al puerto `5432`
+
+__NOTA:__ También podemos usar el namespace como filtro, de modo que por ejemplo, podemos permitir o no el acceso desde pods de un namespace, a pods de otro namespace. Aquí como no hemos indicado nada, la politica se aplica sobre el namespace en el que esta creada - que en nuestro caso es _default_.
+
+### Egress
+
+```yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: salida-desde-nginx
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance : mi-ingress
+  egress:
+  - {}
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: salida-desde-manager
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: manager
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          role: postgres
+    ports:
+    - port: 5432
+      protocol: TCP
+```
+
+- A los pods `app.kubernetes.io/instance : mi-ingress` se les permite cualquier Egress `{}`
+- A los pods `role: manager` se les permite el Egress via `TCP` al puerto `5432`
+
+__NOTA:__ También podemos usar el namespace como filtro, de modo que por ejemplo, podemos permitir o no el acceso desde pods de un namespace, a pods de otro namespace. Aquí como no hemos indicado nada, la politica se aplica sobre el namespace en el que esta creada - que en nuestro caso es _default_.
+### Prueba
+
+Aplicamos las policies:
+
+```ps
+kubectl apply -f .\policy-egress.yaml
+
+kubectl apply -f .\policy-ingress.yaml
+```
+
+y comprobamos que ahora si tenemos acceso:
+
+```ps
+curl "http://www.fgz.com/test/followers/egsmartin"
+```
+
+Obtenemos una respuesta:
+
+```ps
+StatusCode        : 200
+StatusDescription : OK
+Content           : {"followers":{},"err":""}
+
+RawContent        : HTTP/1.1 200 OK
+                    Connection: keep-alive
+                    Content-Length: 26
+                    Content-Type: text/plain; charset=utf-8
+                    Date: Sun, 25 Apr 2021 11:36:36 GMT
+
+                    {"followers":{},"err":""}
+
+Forms             : {}
+Headers           : {[Connection, keep-alive], [Content-Length, 26], [Content-Type, text/plain; charset=utf-8], [Date, Sun, 25 Apr
+                    2021 11:36:36 GMT]}
+Images            : {}
+InputFields       : {}
+Links             : {}
+ParsedHtml        : mshtml.HTMLDocumentClass
+RawContentLength  : 26
+```

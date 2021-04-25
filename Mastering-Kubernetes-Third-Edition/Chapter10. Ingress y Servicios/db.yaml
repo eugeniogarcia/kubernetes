@@ -5,17 +5,20 @@ metadata:
   labels:
     svc: social-graph
     app: postgres
+    role: postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
       svc: social-graph
       app: postgres
+      role: postgres
   template:
     metadata:
       labels:
         svc: social-graph
         app: postgres
+        role: postgres
     spec:
       containers:
       - name: postgres
@@ -40,3 +43,4 @@ spec:
   selector:
     svc: social-graph
     app: postgres
+    role: postgres

@@ -1,0 +1,29 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: salida-desde-nginx
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance : mi-ingress
+  egress:
+  - {}
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: salida-desde-manager
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: manager
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          role: postgres
+    ports:
+    - port: 5432
+      protocol: TCP
