@@ -100,6 +100,9 @@ helm delete istiod -n istio-system
 helm delete istio-base -n istio-system
 
 kubectl delete namespace istio-system
+
+kubectl label namespace default istio-injection-
+
 ```
 
 # Install Bookinfo
@@ -257,4 +260,15 @@ Vamos a enviar carga para ver el dashboard con datos:
 
 ```sh
 for i in $(seq 1 100); do curl -s -o /dev/null "http://$GATEWAY_URL/productpage"; done
+```
+
+## Uninstall
+
+```ps
+kubectl delete -f samples/addons
+```
+
+```sh
+samples/bookinfo/platform/kube/cleanup.sh
+
 ```
